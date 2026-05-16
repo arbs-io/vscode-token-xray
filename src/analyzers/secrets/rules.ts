@@ -4,6 +4,7 @@ import { ATLASSIAN_SECRET_RULES } from './vendorRules/atlassian'
 import { AUTH0_SECRET_RULES } from './vendorRules/auth0'
 import { AWS_SECRET_RULES } from './vendorRules/aws'
 import { AZURE_SECRET_RULES } from './vendorRules/azure'
+import { CI_SECRET_RULES } from './vendorRules/ci'
 import { CLOUDFLARE_SECRET_RULES } from './vendorRules/cloudflare'
 import { COMMS_SECRET_RULES } from './vendorRules/comms'
 import { DBSTRING_SECRET_RULES } from './vendorRules/dbstring'
@@ -45,6 +46,7 @@ export const BUILT_IN_SECRET_RULES: SecretRule[] = [
   ...COMMS_SECRET_RULES,
   ...OBSERVABILITY_SECRET_RULES,
   ...REGISTRIES_SECRET_RULES,
+  ...CI_SECRET_RULES,
   ...GENERIC_SECRET_RULES,
 ]
 
