@@ -1,3 +1,4 @@
+import { AwsSigv4Analyzer } from '../analyzers/awsSigv4/analyzer'
 import { BasicAuthAnalyzer } from '../analyzers/basicAuth/analyzer'
 import { CookieAnalyzer } from '../analyzers/cookie/analyzer'
 import { JwkAnalyzer } from '../analyzers/jwk/analyzer'
@@ -19,6 +20,7 @@ export function createDefaultRegistry(): AnalyzerRegistry {
   registry.register(new CookieAnalyzer())
   registry.register(new PasetoAnalyzer())
   registry.register(new BasicAuthAnalyzer())
+  registry.register(new AwsSigv4Analyzer())
   registry.register(new SecretAnalyzer())
   return registry
 }

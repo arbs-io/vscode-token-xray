@@ -23,6 +23,7 @@ const ICON_FOR: Record<string, string> = {
   cookie: '$(circle-large-outline)',
   paseto: '$(shield)',
   basicAuth: '$(lock)',
+  awsSigv4: '$(key)',
   secret: '$(error)',
 }
 
@@ -38,6 +39,7 @@ const TITLE_FOR: Record<string, (text: string) => string> = {
   cookie: () => '$(circle-large-outline) Inspect Set-Cookie',
   paseto: () => '$(shield) Inspect PASETO token',
   basicAuth: () => '$(lock) Inspect Basic credentials',
+  awsSigv4: () => '$(key) Inspect AWS SigV4',
   secret: () => '$(error) Inspect secret',
 }
 
