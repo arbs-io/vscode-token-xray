@@ -1,4 +1,5 @@
 import { SecretRule } from './types'
+import { AI_SECRET_RULES } from './vendorRules/ai'
 import { AUTH0_SECRET_RULES } from './vendorRules/auth0'
 import { AWS_SECRET_RULES } from './vendorRules/aws'
 import { AZURE_SECRET_RULES } from './vendorRules/azure'
@@ -29,6 +30,7 @@ export const BUILT_IN_SECRET_RULES: SecretRule[] = [
   ...SAILPOINT_SECRET_RULES,
   ...AZURE_SECRET_RULES,
   ...GITHUB_SECRET_RULES,
+  ...AI_SECRET_RULES,
   ...GENERIC_SECRET_RULES,
 ]
 
