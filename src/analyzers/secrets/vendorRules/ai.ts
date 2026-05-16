@@ -13,7 +13,7 @@ const sensitiveAfterDelimiter = (raw: string, valueRe: RegExp) => {
 // {48} length floor pushes past plausible CSS / JS identifier lengths and the
 // trailing `(?![A-Za-z0-9])` blocks longer alnum runs that aren't keys.
 const OPENAI_SECRET_KEY: SecretRule = {
-  id: 'ai.openai.secretKey',
+  id: 'secret.openai.secretKey',
   vendor: 'openai',
   name: 'OpenAI API secret key (sk-…)',
   pattern: /(?<![A-Za-z_-])sk-[A-Za-z0-9]{48}(?![A-Za-z0-9])/g,
@@ -26,7 +26,7 @@ const OPENAI_SECRET_KEY: SecretRule = {
 // OpenAI project-scoped key: `sk-proj-` + 60+ chars from base64url-ish set.
 // Anchored similarly so we don't pick up `sk-projector` etc.
 const OPENAI_PROJECT_KEY: SecretRule = {
-  id: 'ai.openai.projectKey',
+  id: 'secret.openai.projectKey',
   vendor: 'openai',
   name: 'OpenAI project-scoped API key (sk-proj-…)',
   pattern: /(?<![A-Za-z_-])sk-proj-[A-Za-z0-9_-]{60,}(?![A-Za-z0-9_-])/g,
@@ -37,7 +37,7 @@ const OPENAI_PROJECT_KEY: SecretRule = {
 }
 
 const OPENAI_LABELLED: SecretRule = {
-  id: 'ai.openai.labelled',
+  id: 'secret.openai.labelled',
   vendor: 'openai',
   name: 'OpenAI API key (env-labelled OPENAI_API_KEY=)',
   pattern: /(?:OPENAI_API_KEY|openai_api_key|openaiApiKey)["']?\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}["']?/g,
@@ -50,7 +50,7 @@ const OPENAI_LABELLED: SecretRule = {
 
 // Anthropic API key: `sk-ant-` + `api03` (user) or `admin01` (admin) + 93+ chars.
 const ANTHROPIC_API_KEY: SecretRule = {
-  id: 'ai.anthropic.apiKey',
+  id: 'secret.anthropic.apiKey',
   vendor: 'anthropic',
   name: 'Anthropic API key (sk-ant-…)',
   pattern: /(?<![A-Za-z_-])sk-ant-(?:api03|admin01)-[A-Za-z0-9_-]{93,}(?![A-Za-z0-9_-])/g,
@@ -61,7 +61,7 @@ const ANTHROPIC_API_KEY: SecretRule = {
 }
 
 const ANTHROPIC_LABELLED: SecretRule = {
-  id: 'ai.anthropic.labelled',
+  id: 'secret.anthropic.labelled',
   vendor: 'anthropic',
   name: 'Anthropic API key (env-labelled ANTHROPIC_API_KEY=)',
   pattern: /(?:ANTHROPIC_API_KEY|anthropic_api_key|anthropicApiKey)["']?\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}["']?/g,
@@ -74,7 +74,7 @@ const ANTHROPIC_LABELLED: SecretRule = {
 
 // Hugging Face access token: `hf_` + 34+ alphanumeric chars.
 const HUGGINGFACE_TOKEN: SecretRule = {
-  id: 'ai.huggingface.token',
+  id: 'secret.huggingface.token',
   vendor: 'huggingface',
   name: 'Hugging Face access token (hf_…)',
   pattern: /(?<![A-Za-z_-])hf_[A-Za-z0-9]{34,}(?![A-Za-z0-9])/g,
@@ -85,7 +85,7 @@ const HUGGINGFACE_TOKEN: SecretRule = {
 }
 
 const HUGGINGFACE_LABELLED: SecretRule = {
-  id: 'ai.huggingface.labelled',
+  id: 'secret.huggingface.labelled',
   vendor: 'huggingface',
   name: 'Hugging Face access token (env-labelled HF_TOKEN=/HUGGINGFACE_API_KEY=)',
   pattern: /(?:HF_TOKEN|HUGGINGFACE_API_KEY|HUGGING_FACE_HUB_TOKEN|hf_token|huggingface_api_key|huggingFaceToken)["']?\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}["']?/g,
@@ -98,7 +98,7 @@ const HUGGINGFACE_LABELLED: SecretRule = {
 
 // Replicate API token: `r8_` + 40+ alphanumeric chars.
 const REPLICATE_TOKEN: SecretRule = {
-  id: 'ai.replicate.token',
+  id: 'secret.replicate.token',
   vendor: 'replicate',
   name: 'Replicate API token (r8_…)',
   pattern: /(?<![A-Za-z_-])r8_[A-Za-z0-9]{40,}(?![A-Za-z0-9])/g,
@@ -109,7 +109,7 @@ const REPLICATE_TOKEN: SecretRule = {
 }
 
 const REPLICATE_LABELLED: SecretRule = {
-  id: 'ai.replicate.labelled',
+  id: 'secret.replicate.labelled',
   vendor: 'replicate',
   name: 'Replicate API token (env-labelled REPLICATE_API_TOKEN=)',
   pattern: /(?:REPLICATE_API_TOKEN|replicate_api_token|replicateApiToken)["']?\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}["']?/g,

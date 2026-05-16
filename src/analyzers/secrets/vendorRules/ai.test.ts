@@ -14,7 +14,7 @@ const ALNUM_40 = ALNUM_34 + 'abcdef' // 40
 describe('AI_SECRET_RULES — OpenAI classic secret key', () => {
   it('matches sk-<48 alnum>', () => {
     const text = `sk-${ALNUM_48}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.openai.secretKey')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.openai.secretKey')
     expect(hit).toBeDefined()
     expect(hit?.rule.severity).toBe('error')
     expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(`sk-${ALNUM_48}`)
@@ -22,13 +22,13 @@ describe('AI_SECRET_RULES — OpenAI classic secret key', () => {
 
   it('rejects short sk- strings (less than 48 chars after prefix)', () => {
     const short = 'sk-' + 'a'.repeat(20)
-    expect(scanForSecrets(short, opts).some((h) => h.rule.id === 'ai.openai.secretKey')).toBe(false)
+    expect(scanForSecrets(short, opts).some((h) => h.rule.id === 'secret.openai.secretKey')).toBe(false)
   })
 
   it('rejects CSS class name `.sk-loader { … }`', () => {
     expect(
       scanForSecrets('.sk-loader { color: red; }', opts).some(
-        (h) => h.rule.id === 'ai.openai.secretKey'
+        (h) => h.rule.id === 'secret.openai.secretKey'
       )
     ).toBe(false)
   })
@@ -36,7 +36,7 @@ describe('AI_SECRET_RULES — OpenAI classic secret key', () => {
   it('rejects JS identifier `sk-active` (also short)', () => {
     expect(
       scanForSecrets('const sk-active = true;', opts).some(
-        (h) => h.rule.id === 'ai.openai.secretKey'
+        (h) => h.rule.id === 'secret.openai.secretKey'
       )
     ).toBe(false)
   })
@@ -44,12 +44,12 @@ describe('AI_SECRET_RULES — OpenAI classic secret key', () => {
   it('rejects sk- with too many trailing alnum chars (49+) — boundary breaks', () => {
     // 49 alnum -> {48} would match but trailing alnum fails the lookahead.
     const text = `sk-${ALNUM_48}Z`
-    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'ai.openai.secretKey')).toBe(false)
+    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'secret.openai.secretKey')).toBe(false)
   })
 
   it('rejects `sk-` when preceded by a letter / underscore / dash (identifier context)', () => {
     expect(
-      scanForSecrets(`x_sk-${ALNUM_48}`, opts).some((h) => h.rule.id === 'ai.openai.secretKey')
+      scanForSecrets(`x_sk-${ALNUM_48}`, opts).some((h) => h.rule.id === 'secret.openai.secretKey')
     ).toBe(false)
   })
 })
@@ -57,7 +57,7 @@ describe('AI_SECRET_RULES — OpenAI classic secret key', () => {
 describe('AI_SECRET_RULES — OpenAI project key', () => {
   it('matches sk-proj-<60+ chars>', () => {
     const text = `sk-proj-${ALNUM_60}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.openai.projectKey')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.openai.projectKey')
     expect(hit).toBeDefined()
     expect(hit?.rule.severity).toBe('error')
   })
@@ -66,14 +66,14 @@ describe('AI_SECRET_RULES — OpenAI project key', () => {
     const body = 'A'.repeat(30) + '_-' + 'a'.repeat(28) // 60 incl. _-
     const text = `sk-proj-${body}`
     expect(
-      scanForSecrets(text, opts).some((h) => h.rule.id === 'ai.openai.projectKey')
+      scanForSecrets(text, opts).some((h) => h.rule.id === 'secret.openai.projectKey')
     ).toBe(true)
   })
 
   it('rejects sk-proj- with too-short body (< 60 chars)', () => {
     const text = 'sk-proj-' + 'a'.repeat(30)
     expect(
-      scanForSecrets(text, opts).some((h) => h.rule.id === 'ai.openai.projectKey')
+      scanForSecrets(text, opts).some((h) => h.rule.id === 'secret.openai.projectKey')
     ).toBe(false)
   })
 })
@@ -82,7 +82,7 @@ describe('AI_SECRET_RULES — OPENAI_API_KEY labelled', () => {
   it('matches OPENAI_API_KEY=<value> with sensitiveSpan over the value', () => {
     const value = `sk-${ALNUM_48}`
     const text = `OPENAI_API_KEY=${value}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.openai.labelled')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.openai.labelled')
     expect(hit).toBeDefined()
     expect(hit?.rule.severity).toBe('error')
     expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(value)
@@ -91,35 +91,35 @@ describe('AI_SECRET_RULES — OPENAI_API_KEY labelled', () => {
   it('matches quoted JSON OPENAI_API_KEY style', () => {
     const value = 'a'.repeat(40)
     const text = `{"OPENAI_API_KEY": "${value}"}`
-    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'ai.openai.labelled')).toBe(true)
+    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'secret.openai.labelled')).toBe(true)
   })
 
   it('rejects empty value `OPENAI_API_KEY=`', () => {
-    expect(scanForSecrets('OPENAI_API_KEY=', opts).some((h) => h.rule.id === 'ai.openai.labelled')).toBe(false)
+    expect(scanForSecrets('OPENAI_API_KEY=', opts).some((h) => h.rule.id === 'secret.openai.labelled')).toBe(false)
   })
 })
 
 describe('AI_SECRET_RULES — Anthropic API key', () => {
   it('matches sk-ant-api03-<93+ chars>', () => {
     const text = `sk-ant-api03-${ALNUM_93}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.anthropic.apiKey')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.anthropic.apiKey')
     expect(hit).toBeDefined()
     expect(hit?.rule.severity).toBe('error')
   })
 
   it('matches sk-ant-admin01-<93+ chars>', () => {
     const text = `sk-ant-admin01-${ALNUM_93}`
-    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'ai.anthropic.apiKey')).toBe(true)
+    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'secret.anthropic.apiKey')).toBe(true)
   })
 
   it('rejects unknown sub-prefix `sk-ant-foo-…`', () => {
     const text = `sk-ant-foo-${ALNUM_93}`
-    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'ai.anthropic.apiKey')).toBe(false)
+    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'secret.anthropic.apiKey')).toBe(false)
   })
 
   it('rejects sk-ant-api03- with too-short body', () => {
     const text = `sk-ant-api03-${'a'.repeat(50)}`
-    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'ai.anthropic.apiKey')).toBe(false)
+    expect(scanForSecrets(text, opts).some((h) => h.rule.id === 'secret.anthropic.apiKey')).toBe(false)
   })
 })
 
@@ -127,7 +127,7 @@ describe('AI_SECRET_RULES — ANTHROPIC_API_KEY labelled', () => {
   it('matches ANTHROPIC_API_KEY=<value>', () => {
     const value = `sk-ant-api03-${ALNUM_93}`
     const text = `ANTHROPIC_API_KEY=${value}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.anthropic.labelled')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.anthropic.labelled')
     expect(hit).toBeDefined()
     expect(hit?.rule.severity).toBe('error')
     expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(value)
@@ -135,7 +135,7 @@ describe('AI_SECRET_RULES — ANTHROPIC_API_KEY labelled', () => {
 
   it('rejects empty value `ANTHROPIC_API_KEY=`', () => {
     expect(
-      scanForSecrets('ANTHROPIC_API_KEY=', opts).some((h) => h.rule.id === 'ai.anthropic.labelled')
+      scanForSecrets('ANTHROPIC_API_KEY=', opts).some((h) => h.rule.id === 'secret.anthropic.labelled')
     ).toBe(false)
   })
 })
@@ -143,21 +143,21 @@ describe('AI_SECRET_RULES — ANTHROPIC_API_KEY labelled', () => {
 describe('AI_SECRET_RULES — Hugging Face token', () => {
   it('matches hf_<34+ alnum>', () => {
     const text = `hf_${ALNUM_34}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.huggingface.token')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.huggingface.token')
     expect(hit).toBeDefined()
     expect(hit?.rule.severity).toBe('error')
   })
 
   it('rejects `hf_short` (< 34 chars)', () => {
     expect(
-      scanForSecrets('hf_short', opts).some((h) => h.rule.id === 'ai.huggingface.token')
+      scanForSecrets('hf_short', opts).some((h) => h.rule.id === 'secret.huggingface.token')
     ).toBe(false)
   })
 
   it('rejects 33-char hf_ body', () => {
     expect(
       scanForSecrets('hf_' + 'a'.repeat(33), opts).some(
-        (h) => h.rule.id === 'ai.huggingface.token'
+        (h) => h.rule.id === 'secret.huggingface.token'
       )
     ).toBe(false)
   })
@@ -167,7 +167,7 @@ describe('AI_SECRET_RULES — HF labelled envs', () => {
   it('matches HF_TOKEN=<value>', () => {
     const value = 'a'.repeat(40)
     const text = `HF_TOKEN=${value}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.huggingface.labelled')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.huggingface.labelled')
     expect(hit).toBeDefined()
     expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(value)
   })
@@ -176,13 +176,13 @@ describe('AI_SECRET_RULES — HF labelled envs', () => {
     const value = 'a'.repeat(40)
     const text = `HUGGINGFACE_API_KEY=${value}`
     expect(
-      scanForSecrets(text, opts).some((h) => h.rule.id === 'ai.huggingface.labelled')
+      scanForSecrets(text, opts).some((h) => h.rule.id === 'secret.huggingface.labelled')
     ).toBe(true)
   })
 
   it('rejects empty value `HF_TOKEN=`', () => {
     expect(
-      scanForSecrets('HF_TOKEN=', opts).some((h) => h.rule.id === 'ai.huggingface.labelled')
+      scanForSecrets('HF_TOKEN=', opts).some((h) => h.rule.id === 'secret.huggingface.labelled')
     ).toBe(false)
   })
 })
@@ -190,7 +190,7 @@ describe('AI_SECRET_RULES — HF labelled envs', () => {
 describe('AI_SECRET_RULES — Replicate token', () => {
   it('matches r8_<40+ alnum>', () => {
     const text = `r8_${ALNUM_40}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.replicate.token')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.replicate.token')
     expect(hit).toBeDefined()
     expect(hit?.rule.severity).toBe('error')
   })
@@ -198,7 +198,7 @@ describe('AI_SECRET_RULES — Replicate token', () => {
   it('rejects r8_ with body too short (< 40 chars)', () => {
     expect(
       scanForSecrets('r8_' + 'a'.repeat(39), opts).some(
-        (h) => h.rule.id === 'ai.replicate.token'
+        (h) => h.rule.id === 'secret.replicate.token'
       )
     ).toBe(false)
   })
@@ -208,7 +208,7 @@ describe('AI_SECRET_RULES — REPLICATE_API_TOKEN labelled', () => {
   it('matches REPLICATE_API_TOKEN=<value>', () => {
     const value = 'r8_' + ALNUM_40
     const text = `REPLICATE_API_TOKEN=${value}`
-    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'ai.replicate.labelled')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.replicate.labelled')
     expect(hit).toBeDefined()
     expect(hit?.rule.severity).toBe('error')
     expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(value)
@@ -217,7 +217,7 @@ describe('AI_SECRET_RULES — REPLICATE_API_TOKEN labelled', () => {
   it('rejects empty value `REPLICATE_API_TOKEN=`', () => {
     expect(
       scanForSecrets('REPLICATE_API_TOKEN=', opts).some(
-        (h) => h.rule.id === 'ai.replicate.labelled'
+        (h) => h.rule.id === 'secret.replicate.labelled'
       )
     ).toBe(false)
   })
@@ -232,7 +232,7 @@ describe('AI_SECRET_RULES — coverage', () => {
 
   it('all rules are namespaced under ai.<service>.', () => {
     for (const r of AI_SECRET_RULES) {
-      expect(r.id.startsWith('ai.')).toBe(true)
+      expect(r.id.startsWith('secret.')).toBe(true)
       // shape: ai.<service>.<reason>
       expect(r.id.split('.').length).toBeGreaterThanOrEqual(3)
     }
