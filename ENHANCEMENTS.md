@@ -1,21 +1,20 @@
 # Security Inspector — Enhancement Backlog
 
-This file is the single source of truth for the autonomous cron job. Each enhancement is a self-contained unit of work: one branch, one commit, one PR.
+This file is the single source of truth for the autonomous cron job. Each enhancement is a self-contained unit of work: one commit on the current integration branch.
 
 ## Working agreement for the cron
 
 Each fire:
 
-1. `git fetch origin && git checkout main && git pull --ff-only` (or skip pull if offline).
+1. Confirm the working tree is clean on the current branch. **Do not switch branches and do not create new branches** — commit directly on whatever branch is currently checked out (the user's integration branch).
 2. Pick the first **unchecked** enhancement below (top to bottom).
-3. Create a branch named `feat/<slug>` where `<slug>` is the enhancement's slug.
-4. Implement the enhancement.
-5. **Tests are mandatory** — for every new module add `*.test.ts` and ensure `npm run test:coverage` keeps thresholds in `vitest.config.ts` green (90% lines, 90% functions, 85% branches).
-6. `npm run typecheck && npm run test` must pass before commit.
-7. Commit with message: `feat(<analyzer>): <one-line summary>` and the `Co-Authored-By` trailer.
-8. Mark the item complete here (`- [x]`) **in the same commit**.
-9. If `gh` is available, open a PR titled identically. Otherwise leave the branch local — the user will push/PR manually.
-10. Stop after one enhancement per fire. If nothing is unchecked, exit quietly.
+3. Implement the enhancement.
+4. **Tests are mandatory** — for every new module add `*.test.ts` and ensure `npm run test:coverage` keeps thresholds in `vitest.config.ts` green (90% lines, 90% functions, 85% branches).
+5. `npm run typecheck && npm run test` must pass before commit.
+6. Commit with message: `feat(<analyzer>): <one-line summary>` and the `Co-Authored-By` trailer.
+7. Mark the item complete here (`- [x]`) **in the same commit**, and append a dated entry inside the `<!-- DONE-LOG-START -->` block.
+8. Do not push; the user controls remotes.
+9. Stop after one enhancement per fire. If nothing is unchecked, exit quietly.
 
 ## Rules of the road
 
