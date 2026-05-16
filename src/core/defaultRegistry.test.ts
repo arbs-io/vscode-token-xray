@@ -16,6 +16,7 @@ describe('createDefaultRegistry', () => {
       'paseto',
       'saml',
       'secret',
+      'sshKey',
       'x509',
     ])
   })
@@ -32,6 +33,7 @@ describe('createDefaultRegistry', () => {
     expect(reg.get('basicAuth')?.id).toBe('basicAuth')
     expect(reg.get('awsSigv4')?.id).toBe('awsSigv4')
     expect(reg.get('csr')?.id).toBe('csr')
+    expect(reg.get('sshKey')?.id).toBe('sshKey')
     expect(reg.get('secret')?.id).toBe('secret')
   })
 })

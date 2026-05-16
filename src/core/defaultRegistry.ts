@@ -8,6 +8,7 @@ import { OAuthTokenAnalyzer } from '../analyzers/oauth/analyzer'
 import { PasetoAnalyzer } from '../analyzers/paseto/analyzer'
 import { SamlAnalyzer } from '../analyzers/saml/analyzer'
 import { SecretAnalyzer } from '../analyzers/secrets/analyzer'
+import { SshKeyAnalyzer } from '../analyzers/sshKey/analyzer'
 import { X509Analyzer } from '../analyzers/x509/analyzer'
 import { AnalyzerRegistry } from './registry'
 
@@ -23,6 +24,7 @@ export function createDefaultRegistry(): AnalyzerRegistry {
   registry.register(new BasicAuthAnalyzer())
   registry.register(new AwsSigv4Analyzer())
   registry.register(new CsrAnalyzer())
+  registry.register(new SshKeyAnalyzer())
   registry.register(new SecretAnalyzer())
   return registry
 }
