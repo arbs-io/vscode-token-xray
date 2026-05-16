@@ -10,6 +10,7 @@ import { GENERIC_SECRET_RULES } from './vendorRules/generic'
 import { GITHUB_SECRET_RULES } from './vendorRules/github'
 import { OKTA_SECRET_RULES } from './vendorRules/okta'
 import { SAILPOINT_SECRET_RULES } from './vendorRules/sailpoint'
+import { VAULT_SECRET_RULES } from './vendorRules/vault'
 
 const PEM_PRIVATE_KEY: SecretRule = {
   id: 'secret.privateKey.pem',
@@ -33,6 +34,7 @@ export const BUILT_IN_SECRET_RULES: SecretRule[] = [
   ...GITHUB_SECRET_RULES,
   ...AI_SECRET_RULES,
   ...DBSTRING_SECRET_RULES,
+  ...VAULT_SECRET_RULES,
   ...GENERIC_SECRET_RULES,
 ]
 
