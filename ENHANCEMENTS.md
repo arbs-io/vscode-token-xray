@@ -1,0 +1,145 @@
+# Security Inspector — Enhancement Backlog
+
+This file is the single source of truth for the autonomous cron job. Each enhancement is a self-contained unit of work: one branch, one commit, one PR.
+
+## Working agreement for the cron
+
+Each fire:
+
+1. `git fetch origin && git checkout main && git pull --ff-only` (or skip pull if offline).
+2. Pick the first **unchecked** enhancement below (top to bottom).
+3. Create a branch named `feat/<slug>` where `<slug>` is the enhancement's slug.
+4. Implement the enhancement.
+5. **Tests are mandatory** — for every new module add `*.test.ts` and ensure `npm run test:coverage` keeps thresholds in `vitest.config.ts` green (90% lines, 90% functions, 85% branches).
+6. `npm run typecheck && npm run test` must pass before commit.
+7. Commit with message: `feat(<analyzer>): <one-line summary>` and the `Co-Authored-By` trailer.
+8. Mark the item complete here (`- [x]`) **in the same commit**.
+9. If `gh` is available, open a PR titled identically. Otherwise leave the branch local — the user will push/PR manually.
+10. Stop after one enhancement per fire. If nothing is unchecked, exit quietly.
+
+## Rules of the road
+
+- **No vscode-coupled code in `src/analyzers/**` or `src/core/**`.** Those layers must remain pure TS so Vitest can test them with no mocks.
+- **All findings use `id` namespaces**: `<analyzer>.<area>.<reason>` (e.g. `jwt.alg.none`, `aws.key.exposed`).
+- **No network access at analysis time** unless the user explicitly opts in via setting. Document the setting.
+- **Never log token contents** to console/output.
+- Keep PRs small. If an item grows beyond ~300 LOC of source, split it and add a follow-up item here.
+
+---
+
+## Tier 1 — JWT hardening
+
+- [x] **foundations**: Analyzer interface, registry, base64url, JWT decoder/findings/analyzer, Vitest setup. _(done in foundations PR)_
+- [x] **jwt-jwe-detect** — Detect 5-segment JWE tokens distinctly from JWS in the semantic provider and webview. Show `enc`/`alg` of JWE header, explain that payload is encrypted and cannot be inspected without a key. Update `firstLine` regex on the `jwt` language to match 5-segment tokens. Tests: detector returns kind=JWE, analyzer produces only a header section.
+- [x] **jwt-findings-panel** — Render `AnalysisResult.findings` in the webview as a top banner: red (error), yellow (warning), blue (info). Wire `App.tsx` to consume the new shape over the existing claimset shape. Tests: webview utility that maps findings → display rows.
+- [x] **jwt-diagnostics** — Publish findings as `vscode.Diagnostic` entries on the JWT document so they appear in the Problems panel. New `src/providers/diagnosticsProvider.ts`. Tests: unit-test a pure mapper `findingsToDiagnostics(findings, ranges)` (no vscode import — use a thin DTO).
+- [x] **jwt-codelens** — `CodeLensProvider` that scans any open document for JWT-shaped strings and offers an "Inspect JWT" lens. Tests: pure detector function with sample documents (env files, .http files, source code).
+- [x] **jwt-signature-verify** — Add optional signature verification using `jose` (npm). Settings: `securityInspector.jwt.jwks` (URL), `securityInspector.jwt.keys` (PEM/JWK array). Off by default. Show "verified ✓" or "verification failed" finding. Tests: pure verify function with fixture keys (RS256, ES256, HS256). _(JWKS URL fetch deferred to a follow-up — current impl supports PEM/JWK/symmetric only.)_
+
+## Tier 2 — Adjacent formats
+
+- [x] **saml-analyzer** — Detect SAML responses/assertions (base64-encoded XML, sometimes DEFLATE-compressed). New `src/analyzers/saml/`. Surface: Issuer, NameID, Conditions (NotBefore/NotOnOrAfter), AudienceRestriction, Signature presence/algorithm, Encrypted assertions. Tests: parse sample assertions in `/sample`.
+- [x] **x509-analyzer** — Detect PEM-encoded certificates. New `src/analyzers/x509/`. Surface: Subject, Issuer, SAN, Validity, KeyUsage, signature algorithm, public-key size. Findings: expired, RSA<2048, SHA-1 signature, self-signed. _(Implemented with Node built-in `crypto.X509Certificate` + a tiny OID byte-scan for signature algorithm — no new dependency.)_
+- [x] **jwk-analyzer** — Detect JWK / JWKS JSON documents. Surface: kty, alg, kid, use, key size. Findings: insufficient key size, missing kid, deprecated curves.
+- [x] **oauth-token-analyzer** — Classify tokens beyond JWT: opaque access tokens (length/charset heuristics), refresh tokens, GitHub PATs (`ghp_`, `github_pat_`, `ghs_`, `gho_`), Slack tokens (`xox[bpoars]-`), Stripe keys (`sk_live_`, `pk_test_`). Tests: detector hit-list.
+- [x] **cookie-analyzer** — Parse `Set-Cookie` and `Cookie` header values. Findings: missing `Secure`, missing `HttpOnly`, `SameSite=None` without `Secure`, no expiry, JWT-as-cookie. Tests: header parser unit tests.
+
+## Tier 3 — Secret scanning across files
+
+- [x] **secret-scanner-core** — New `src/analyzers/secrets/`. Pure detector taking text + filename hint, returning `Finding[]` with byte ranges. No vscode imports. Tests: positive + negative samples for each detector. _(Ships with the canonical PEM private-key rule. Vendor-specific rules land via subsequent `secret-*` items, registered through `createRuleSet`.)_
+- [x] **secret-aws** — AWS access key (`AKIA[0-9A-Z]{16}`), secret key heuristics, session tokens, ARNs leaking account ids.
+- [x] **secret-gcp** — GCP service account JSON shape (`"type": "service_account"` + private_key block), API keys (`AIza[0-9A-Za-z\-_]{35}`).
+- [x] **secret-okta** — Okta API tokens (`Authorization: SSWS <token>` and bare `00[A-Za-z0-9_-]{40,}` Okta token format), Okta OAuth client_secret pattern, optional issuer-aware finding pointing at the Okta tenant. Tests: positive + negative samples with SSWS header and direct token forms. _(Issuer-aware finding deferred to `idp-issuer-findings`. Bare-`00…` form omitted — too prone to false positives without a label or scheme; SSWS-header and labelled-env forms cover the realistic leak surfaces.)_
+- [x] **secret-cloudflare** — Cloudflare global API key (`X-Auth-Key: [0-9a-f]{37}`), scoped API tokens (40 base64url chars typically following `Bearer ` or `Authorization:` in Cloudflare-adjacent context), Cloudflare Access service tokens (`<client_id>.access.<tenant>` + `<client_secret>` env vars), Cloudflare Tunnel tokens. Tests: per-pattern.
+- [x] **idp-issuer-findings** — Extend the JWT analyzer with an issuer-recognition table: when `iss` matches known IdP URL patterns (Entra v1 `sts.windows.net/{tid}/`, Entra v2 `login.microsoftonline.com/{tid}/v2.0`, Okta `*.okta.com/oauth2/*`, Auth0 `*.auth0.com/`, Cognito `cognito-idp.<region>.amazonaws.com/<pool>`, Cloudflare Access `*.cloudflareaccess.com`, SailPoint `*.identitynow.com/oauth`), surface an info finding identifying the IdP, the tenant/pool/domain, and a doc URL. Tests: pure issuer-classifier function over fixture iss values; emits finding ids like `jwt.idp.entraV1` etc. _(Also recognises Google Accounts, Firebase, GitHub Actions OIDC, GitLab OIDC for bonus coverage.)_
+- [x] **secret-auth0** — Auth0 Management API tokens (JWT with `iss` ending in `.auth0.com`, exposes `azp`/`scope` for Management API access — error if leaked), Auth0 client_secret pattern (32 char alphanumeric adjacent to `AUTH0_CLIENT_SECRET=`). Tests: per-pattern. _(Also: AUTH0_DOMAIN env exposure as info finding. Auth0 IdP issuer is already recognised via `idp-issuer-findings`.)_
+- [x] **secret-sailpoint** — SailPoint Identity Security Cloud Personal Access Tokens (UUID-shaped `<client_id>.<client_secret>` pairs in env vars like `SAIL_CLIENT_ID=`/`SAIL_CLIENT_SECRET=`), API client_secret pattern (base64url 44+ chars adjacent to SailPoint labels), and Tenant URLs in form `<tenant>.api.identitynow.com`. Tests: per-pattern with positive + negative cases. _(Supports SAIL_ / SAILPOINT_ / IDN_ / ISC_ prefixes plus camelCase variants.)_
+- [x] **secret-azure** — Azure SAS tokens (`sig=...&se=...&sp=...`), connection strings (`AccountName=...;AccountKey=...`), client secrets pattern. _(Six rules: AccountKey, SharedAccessKey, SAS query token, AZURE_CLIENT_SECRET / ARM_CLIENT_SECRET, subscription ID, tenant ID.)_
+- [x] **secret-github** — PATs, fine-grained PATs, OAuth tokens, app installation tokens, refresh tokens (`ghr_`). _(Token-form GitHub creds (ghp_/gho_/ghu_/ghs_/ghr_/github_pat_) are already covered by the OAuth-token-analyzer's vendor patterns to avoid duplicate diagnostics. This rule set adds the *additional* GitHub surfaces — labelled `GITHUB_CLIENT_SECRET` / `GITHUB_WEBHOOK_SECRET` / `GITHUB_APP_PRIVATE_KEY_PATH`.)_
+- [x] **secret-generic** — Private keys (`-----BEGIN (RSA|EC|OPENSSH|DSA) PRIVATE KEY-----`), high-entropy strings (Shannon entropy > 4.5 with length > 20) flagged informationally, JWT-shaped strings in .env files. _(PEM private-key rule already shipped with `secret-scanner-core`; this item adds the high-entropy detector (info, requires >=3 char classes to suppress IDs) and JWT-in-`.env` detector (warning). Scanner `dedupe` now also suppresses info-severity hits fully overlapped by higher-severity hits so the high-entropy rule never double-flags an AKIA/secret-access-key.)_
+- [ ] **secret-diagnostics-provider** — Wire secret scanner into a `DiagnosticCollection` across all text documents (with size/glob limits). Settings: `securityInspector.secrets.enabled` (default true), `securityInspector.secrets.exclude` (glob array). Tests: pure `scanText(text, filename, settings)` function.
+- [ ] **secret-redact-quickfix** — `CodeActionProvider` offering "Redact" (replace with `***`) or "Move to .env.example" quick fixes for secret findings. Tests: pure mapper finding → CodeAction DTO.
+
+## Tier 4 — Additional token / cryptographic formats
+
+- [ ] **paseto-analyzer** — Detect PASETO v1–v4 tokens with shape `v{1-4}.{local|public}.{payload}[.{footer}]`. Header section reveals version + purpose; for `public` decode the base64url JSON payload, for `local` show "payload is encrypted, cannot inspect without key". Findings: `paseto.version.deprecated` (info) on v1/v2, `paseto.purpose.local` (info). New `src/analyzers/paseto/`. Tests: per-version detector + analyzer output.
+- [ ] **basic-auth-analyzer** — Detect `Authorization: Basic <base64>` HTTP headers and standalone base64-encoded `user:pass` patterns adjacent to auth labels. Decode + surface username; mask password to last 2 chars. Finding `basic.cred.plaintext` (error). New `src/analyzers/basicAuth/`. Tests: positive + negative samples.
+- [ ] **aws-sigv4-analyzer** — Detect `Authorization: AWS4-HMAC-SHA256 Credential=AKIA…/…/…/…/aws4_request, SignedHeaders=…, Signature=…` headers. Parse Credential (access key ID + region + service) and SignedHeaders. Finding `aws.sigv4.accessKeyExposed` (warning) — access key ID is plaintext. New `src/analyzers/awsSigv4/`. Tests: header parser unit tests.
+- [ ] **der-cert-analyzer** — Detect DER-encoded x509 certificates (base64-DER without PEM armor, common in `.cer`/`.crt` files). Heuristic: filename ends in `.cer`/`.crt`, content is base64 and decodes to ASN.1 SEQUENCE matching x509 structure. Reuse x509 decoder. Tests: fixture `.cer` with a synthesised cert.
+- [ ] **csr-analyzer** — Detect `-----BEGIN CERTIFICATE REQUEST-----` PEM blocks. Surface subject and requested SANs via Node `crypto` X.509 helpers where available, or pure ASN.1 walk. Findings: `csr.key.weakRsa` (RSA <2048), `csr.san.missing`. New `src/analyzers/csr/`. Tests: fixture CSRs.
+- [ ] **ssh-key-analyzer** — Detect OpenSSH public keys: `ssh-rsa AAAA…`, `ssh-ed25519 AAAA…`, `ecdsa-sha2-nistp{256,384,521} AAAA…`, `ssh-dss AAAA…`. Parse type + base64 body + comment. Findings: `ssh.key.weakDsa` (error on `ssh-dss`), `ssh.key.weakRsa` (RSA <2048). New `src/analyzers/sshKey/`. Tests: per type.
+- [ ] **pgp-analyzer** — Detect `-----BEGIN PGP {PUBLIC KEY BLOCK,PRIVATE KEY BLOCK,SIGNATURE,MESSAGE}-----` blocks. Surface block type and packet header bytes. Findings: `pgp.privateKey.present` (error), `pgp.message.encrypted` (info). New `src/analyzers/pgp/`. Tests: per block type.
+- [ ] **oidc-discovery-analyzer** — Detect OIDC discovery JSON. Heuristic: file path ends in `.well-known/openid-configuration` OR JSON contains `issuer` + `jwks_uri` + `authorization_endpoint`. Surface: issuer, jwks_uri, supported algs, supported scopes, response types. Findings: `oidc.algs.noneAllowed` (error), `oidc.algs.weakHs256Allowed` (info), `oidc.endpoint.notHttps` (warning). New `src/analyzers/oidcDiscovery/`. Tests: fixture configs.
+- [ ] **saml-metadata-analyzer** — Detect SAML 2.0 metadata XML (root `EntityDescriptor` or `EntitiesDescriptor`). Distinct from assertions. Surface: entityID, role (IdP/SP), NameIDFormats, AssertionConsumerService URLs, signing certs and their expiry. Findings: `samlMeta.signing.missing`, `samlMeta.cert.expired`, `samlMeta.cert.expiringSoon`. New `src/analyzers/samlMetadata/`. Tests: fixture metadata.
+- [ ] **http-signature-analyzer** — Detect RFC 9421 / draft `Signature: keyId=…, algorithm=…, headers=…, signature=…` HTTP signature headers. Surface fields and algorithm. Finding `httpsig.algorithm.weak` for `hmac-sha1`/`rsa-sha1`. New `src/analyzers/httpSignature/`. Tests: header parser.
+
+## Tier 5 — Additional secret rule vendors
+
+Drop into `src/analyzers/secrets/vendorRules/` and register from `rules.ts`, following the existing per-vendor pattern (one file per vendor with rules + test file).
+
+- [ ] **secret-ai** — OpenAI `sk-[A-Za-z0-9]{48}` and project keys `sk-proj-[A-Za-z0-9_-]{60,}`, Anthropic `sk-ant-(?:api03|admin01)-[A-Za-z0-9_-]{93,}`, Hugging Face `hf_[A-Za-z0-9]{34,}`, Replicate `r8_[A-Za-z0-9]{40,}`, labelled `OPENAI_API_KEY=`/`ANTHROPIC_API_KEY=`. Tests: per pattern + negative (`sk-` in CSS class names).
+- [ ] **secret-dbstring** — Database URIs with embedded passwords: `postgres(?:ql)?://[^:@\s]+:[^@\s]+@`, `mysql://[^:@\s]+:[^@\s]+@`, `mongodb(?:\+srv)?://[^:@\s]+:[^@\s]+@`, `redis://[^:@\s]+:[^@\s]+@`, JDBC `jdbc:[a-z]+://[^?]+\?[^&]*password=[^&\s]+`. Severity error, mark `sensitiveSpan` over the password only. Tests: positive + negative (passwordless URLs must not match).
+- [ ] **secret-vault** — HashiCorp Vault tokens `hvs\.[A-Za-z0-9_-]{24,}` (service) and `hvr\.[A-Za-z0-9]{24,}` (root); Terraform Cloud user tokens `[A-Za-z0-9]{14}\.atlasv1\.[A-Za-z0-9_-]{60,}`; labelled `VAULT_TOKEN=`, `TF_TOKEN_app_terraform_io=`. Tests: per pattern.
+- [ ] **secret-atlassian** — Atlassian Cloud API tokens `ATATT3xFfGF0[A-Za-z0-9_-]+`, labelled `JIRA_API_TOKEN=`/`CONFLUENCE_API_TOKEN=`, Atlassian OAuth client_secrets adjacent to `ATLASSIAN_OAUTH_CLIENT_SECRET=`. Tests: per pattern.
+- [ ] **secret-gitlab** — `glpat-[A-Za-z0-9_-]{20,}` PATs, `gloas-[a-f0-9]{64}` OAuth, `glrt-[A-Za-z0-9_-]{20,}` runner, `gldt-[A-Za-z0-9_-]{20,}` deploy, `glffct-[A-Za-z0-9_-]+` feature flag client tokens, `glcbt-[A-Za-z0-9_-]+` CI/CD job tokens. Tests: per pattern.
+- [ ] **secret-comms** — Twilio account SID `AC[a-f0-9]{32}`, Twilio API key SID `SK[a-f0-9]{32}`, Twilio auth token (32 hex labelled `TWILIO_AUTH_TOKEN=`), SendGrid `SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}`, Mailgun `key-[a-f0-9]{32}`, Telegram bot `\d{8,10}:[A-Za-z0-9_-]{35}`, Discord bot token (3 base64 segments joined by `.`). Tests: per pattern.
+- [ ] **secret-observability** — Datadog API key (32 hex labelled `DD_API_KEY=`/`DATADOG_API_KEY=`), Datadog APP key (40 hex labelled), New Relic `NRAK-[A-Z0-9]{27}` user / `NRAA-[A-Z0-9]{27}` ingest / `NRAL-[A-Z0-9]{27}` license, Sentry DSN `https://[a-f0-9]{32}@(?:o\d+\.)?(?:ingest\.)?sentry\.io/\d+`, PagerDuty token (20 chars labelled). Tests: per pattern.
+- [ ] **secret-registries** — npm `npm_[A-Za-z0-9]{36}`, NuGet `oy2[a-zA-Z0-9_-]{43}`, PyPI macaroon `pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{100,}`, Docker Hub `dckr_pat_[A-Za-z0-9_-]+`, JFrog Artifactory `AKCp[A-Za-z0-9]{67}`. Tests: per pattern.
+- [ ] **secret-ci** — CircleCI `CCIPAT_[A-Za-z0-9_-]{40,}`, Buildkite agent `bka_[A-Za-z0-9]{52}` and API `bkua_[A-Za-z0-9]{40}`, Codecov upload token (labelled UUID). Tests: per pattern.
+- [ ] **secret-payments** — Square access tokens `EAAA[A-Za-z0-9_-]{60,}`, Square app secret `sq0csp-[A-Za-z0-9_-]{43}`, Square app id `sq0idp-[A-Za-z0-9_-]{22}`, PayPal `access_token\$(?:production|sandbox)\$[a-z0-9]+\$[a-f0-9]{32}`. Tests: per pattern.
+- [ ] **secret-productivity** — Notion `secret_[A-Za-z0-9]{43}`, Linear `lin_api_[A-Za-z0-9]{40}` and OAuth `lin_oauth_[A-Za-z0-9]{40,}`, Figma `figd_[A-Za-z0-9_-]{40,}`, Postman `PMAK-[a-f0-9]{24}-[a-f0-9]{34}`, labelled Asana / Monday.com PATs. Tests: per pattern.
+- [ ] **secret-misc** — Mapbox `pk\.[A-Za-z0-9_-]{60,}\.[A-Za-z0-9_-]{20,}` access tokens, Algolia admin (32 hex labelled `ALGOLIA_ADMIN_KEY=`), DigitalOcean `dop_v1_[a-f0-9]{64}`, labelled `SNYK_TOKEN=` (UUID), labelled `HEROKU_API_KEY=` (UUID). Tests: per pattern.
+
+## Tier 6 — Additional providers and surface integrations
+
+- [ ] **hover-all-analyzers** — Extend hover so SAML / x509 / JWK / OAuth / cookie / secret detections in any document (not just `jwt`-language files) produce a hover preview. Pure helper `buildHoverMarkdown(analysisResult): string`; the provider adapter calls `scanDocument` then runs `analyze()` for the hit under the cursor. Tests: pure helper across each analyzer kind.
+- [ ] **inlay-hints-provider** — New `src/providers/inlayHintsProvider.ts` rendering inline annotations next to detected tokens (e.g. `[exp in 3d]`, `[live]`, `[expired]`, `[RSA-1024]`). Setting `tokenXray.inlayHints.enabled` (default true). Pure mapper `findingsToInlayDtos(findings, kind, range)`. Tests on the mapper.
+- [ ] **documentlinks-provider** — `DocumentLinkProvider` that makes `iss` URL claims, finding `docUrl`s, and recognised IdP URLs clickable inside source files. Pure helper extracting URL ranges from `AnalysisResult`. Tests on the helper.
+- [ ] **documentsymbols-provider** — `DocumentSymbolProvider` listing detected tokens as outline entries (one symbol per analyzer hit, named after kind + first claim). Tests: pure mapper.
+- [ ] **findings-treeview** — `TreeDataProvider` registered to a `tokenXray` activity-bar view container, listing workspace-wide findings grouped by analyzer with reveal-in-editor on click. Pure `buildTree(findings)` builder, vscode wiring kept thin. Tests on the builder.
+- [ ] **statusbar-badge** — `StatusBarItem` showing the active document's finding counts (`$(shield) 2 errors, 1 warning`); click opens Problems panel filtered to `source: tokenXray`. Pure `summarizeFindings(findings)` mapper. Tests on the mapper.
+- [ ] **inline-disable-comments** — Honor `// tokenxray-disable-next-line <ruleId>` and `# tokenxray-disable-next-line <ruleId>` plus file-scoped `tokenxray-disable-file <ruleId>`. Pure `applyDisableComments(findings, text)` filter applied before findings escape the registry. Tests across `//` and `#` comment styles.
+- [ ] **tokenxray-ignore-file** — Honor a workspace-root `.tokenxrayignore` with `.gitignore`-style glob patterns for path-level suppression. Pure `matchIgnore(relPath, patterns)` helper. Tests: globs, negations, comments.
+- [ ] **per-rule-severity-override** — Setting `tokenXray.ruleSeverity` (object mapping rule id → `error`|`warning`|`info`|`off`). Pure `applySeverityOverrides(findings, overrides)` applied at the registry boundary. Tests on the mapper.
+- [ ] **output-channel** — `OutputChannel` named "Token X-Ray" logging scan counts and suppressions for troubleshooting. Gated by setting `tokenXray.debug` (default false). Pass-through wiring; no unit tests required beyond compile.
+- [ ] **notebook-cell-scanning** — Verify `.ipynb` cells are scanned by the existing diagnostics provider; if not, register a `NotebookCellTextDocumentChange` listener so cell text contributes to the diagnostic collection. Pure scan over an `.ipynb` JSON fixture. Tests.
+
+## Tier 7 — IdP issuer recognition expansion
+
+- [ ] **idp-issuer-expanded** — Add IdP patterns to `src/analyzers/jwt/issuerRecognition.ts` for: Ping Identity (`*.pingone.com/*`, `*.pingidentity.cloud/*`), ForgeRock (`*.forgerock.io/*`, `*.identitycloud.com/*`), OneLogin (`*.onelogin.com/oidc/2`), Keycloak (`/auth/realms/{realm}` URL shape), Salesforce (`login.salesforce.com`, `*.my.salesforce.com`), Apple (`appleid.apple.com`), Microsoft B2C (`*.b2clogin.com/*`), Clerk (`*.clerk.accounts.dev`, `clerk.*.com`), WorkOS (`api.workos.com`), Frontegg (`*.frontegg.com`), Descope (`api.descope.com/*`), Twitch (`id.twitch.tv/oauth2`), LinkedIn (`www.linkedin.com`), Discord OIDC (`discord.com`). Each emits `jwt.idp.<id>` info finding with tenant extraction where applicable. Tests: per-IdP positive iss fixtures + a negative.
+
+## Cross-cutting
+
+- [ ] **rename-cleanup** — Audit any user-facing strings still referencing "jwt-decoder"; update README, marketplace assets references, screenshots list (don't replace images). Update repository description suggestion in README footer.
+- [ ] **ci-tests** — Update `.github/workflows/vsix-package.yaml` to run `npm run typecheck && npm run test` before packaging.
+- [ ] **changelog** — Create `CHANGELOG.md` and backfill 2.0.0 entry summarizing all merged enhancements.
+
+---
+
+## Done log
+
+The cron appends one line per completed enhancement here so the user can scan progress:
+
+<!-- DONE-LOG-START -->
+- 2026-05-16 jwt-jwe-detect — pure semantic parser + JWE-aware provider + JWE token types/colours + hover notice
+- 2026-05-16 jwt-findings-panel — rich panel payload (header + claims + findings), webview banner, JWE notice
+- 2026-05-16 jwt-diagnostics — findings published to Problems panel via DiagnosticCollection (pure DTO mapper + vscode adapter)
+- 2026-05-16 jwt-codelens — pure scan-any-document detector + CodeLens "Inspect JWT" + jwt.inspectTokenAtRange command
+- 2026-05-16 jwt-signature-verify — pure verifyJwt (HS/RS/ES) + augmentWithVerification + keyLoader + opt-in settings
+- 2026-05-16 saml-analyzer — SAML decoder (XML / base64 / DEFLATE+base64) + findings (signature, validity, audience, encrypted)
+- 2026-05-16 x509-analyzer — PEM cert decoder (Node built-in X509Certificate) + sig-algorithm OID scan + findings (expired, weak key/sig, self-signed, missing SAN)
+- 2026-05-16 jwk-analyzer — JWK/JWKS decoder + findings (weak key, deprecated curve, private material, missing kid)
+- 2026-05-16 oauth-token-analyzer — vendor token pattern table (GitHub 6 / Slack 5 / Stripe 6) with severity tiers (live=error, test=warn, publishable=info)
+- 2026-05-16 cookie-analyzer — RFC 6265 Set-Cookie parser + 8 findings (Secure, HttpOnly, SameSite, expiry, JWT-as-cookie, public-suffix Domain)
+- 2026-05-16 secret-scanner-core — SecretRule/SecretHit types, rule registry (createRuleSet), pure scanner with byte ranges + Analyzer adapter; ships PEM private key rule
+- 2026-05-16 secret-aws — AWS access keys (AKIA error / ASIA warn), labelled AWS_SECRET_ACCESS_KEY with sensitiveSpan, ARNs (with doc-example suppression)
+- 2026-05-16 secret-gcp — service-account JSON marker, AIza API key, OAuth client_secret + refresh + access (ya29) tokens
+- 2026-05-16 secret-okta — SSWS header token (sensitiveSpan), labelled OKTA_API_TOKEN, labelled OKTA_CLIENT_SECRET
+- 2026-05-16 secret-cloudflare — global API key (X-Auth-Key), scoped API token (labelled), Access client_id/client_secret, Tunnel token
+- 2026-05-16 idp-issuer-findings — JWT iss → IdP recognition table (Entra v1/v2, Okta, Auth0, Cognito, Cloudflare Access, SailPoint, Google, Firebase, GitHub/GitLab OIDC); emits jwt.idp.* info findings
+- 2026-05-16 secret-auth0 — labelled AUTH0_CLIENT_SECRET (32+ chars), Management API token (JWT-shaped), AUTH0_DOMAIN tenant exposure
+- 2026-05-16 secret-sailpoint — labelled client_id/client_secret/tenant URL (SAIL_/SAILPOINT_/IDN_/ISC_ prefixes + camelCase)
+- 2026-05-16 secret-azure — storage AccountKey, SharedAccessKey, SAS query token, AZURE_CLIENT_SECRET, subscription/tenant IDs
+- 2026-05-16 secret-github — labelled client_secret / webhook_secret / app private-key path (token forms remain in oauth-token-analyzer to avoid duplicate diagnostics); also unblocked TS6/jose6/vitest4 dep upgrade
+- 2026-05-16 secret-generic — high-entropy detector (info, requires >=3 char classes), JWT-in-.env detector (warning), cross-rule dedup so info hits never double-flag higher-severity ranges
+<!-- DONE-LOG-END -->
