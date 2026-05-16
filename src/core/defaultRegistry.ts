@@ -6,6 +6,7 @@ import { JwkAnalyzer } from '../analyzers/jwk/analyzer'
 import { JwtAnalyzer } from '../analyzers/jwt/analyzer'
 import { OAuthTokenAnalyzer } from '../analyzers/oauth/analyzer'
 import { PasetoAnalyzer } from '../analyzers/paseto/analyzer'
+import { PgpAnalyzer } from '../analyzers/pgp/analyzer'
 import { SamlAnalyzer } from '../analyzers/saml/analyzer'
 import { SecretAnalyzer } from '../analyzers/secrets/analyzer'
 import { SshKeyAnalyzer } from '../analyzers/sshKey/analyzer'
@@ -25,6 +26,7 @@ export function createDefaultRegistry(): AnalyzerRegistry {
   registry.register(new AwsSigv4Analyzer())
   registry.register(new CsrAnalyzer())
   registry.register(new SshKeyAnalyzer())
+  registry.register(new PgpAnalyzer())
   registry.register(new SecretAnalyzer())
   return registry
 }

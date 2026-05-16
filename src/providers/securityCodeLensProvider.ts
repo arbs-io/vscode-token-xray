@@ -26,6 +26,7 @@ const ICON_FOR: Record<string, string> = {
   awsSigv4: '$(key)',
   csr: '$(file-symlink-file)',
   sshKey: '$(symbol-key)',
+  pgp: '$(lock)',
   secret: '$(error)',
 }
 
@@ -44,6 +45,7 @@ const TITLE_FOR: Record<string, (text: string) => string> = {
   awsSigv4: () => '$(key) Inspect AWS SigV4',
   csr: () => '$(file-symlink-file) Inspect CSR',
   sshKey: () => '$(symbol-key) Inspect SSH key',
+  pgp: () => '$(lock) Inspect PGP block',
   secret: () => '$(error) Inspect secret',
 }
 

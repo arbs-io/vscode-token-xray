@@ -14,6 +14,7 @@ describe('createDefaultRegistry', () => {
       'jwt',
       'oauth',
       'paseto',
+      'pgp',
       'saml',
       'secret',
       'sshKey',
@@ -34,6 +35,7 @@ describe('createDefaultRegistry', () => {
     expect(reg.get('awsSigv4')?.id).toBe('awsSigv4')
     expect(reg.get('csr')?.id).toBe('csr')
     expect(reg.get('sshKey')?.id).toBe('sshKey')
+    expect(reg.get('pgp')?.id).toBe('pgp')
     expect(reg.get('secret')?.id).toBe('secret')
   })
 })
