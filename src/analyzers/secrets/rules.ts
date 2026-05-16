@@ -9,6 +9,7 @@ import { DBSTRING_SECRET_RULES } from './vendorRules/dbstring'
 import { GCP_SECRET_RULES } from './vendorRules/gcp'
 import { GENERIC_SECRET_RULES } from './vendorRules/generic'
 import { GITHUB_SECRET_RULES } from './vendorRules/github'
+import { GITLAB_SECRET_RULES } from './vendorRules/gitlab'
 import { OKTA_SECRET_RULES } from './vendorRules/okta'
 import { SAILPOINT_SECRET_RULES } from './vendorRules/sailpoint'
 import { VAULT_SECRET_RULES } from './vendorRules/vault'
@@ -33,6 +34,7 @@ export const BUILT_IN_SECRET_RULES: SecretRule[] = [
   ...SAILPOINT_SECRET_RULES,
   ...AZURE_SECRET_RULES,
   ...GITHUB_SECRET_RULES,
+  ...GITLAB_SECRET_RULES,
   ...AI_SECRET_RULES,
   ...DBSTRING_SECRET_RULES,
   ...VAULT_SECRET_RULES,
