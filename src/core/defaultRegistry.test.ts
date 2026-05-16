@@ -5,7 +5,7 @@ describe('createDefaultRegistry', () => {
   it('registers all built-in analyzers', () => {
     const reg = createDefaultRegistry()
     const ids = reg.list().map((a) => a.id).sort()
-    expect(ids).toEqual(['cookie', 'jwk', 'jwt', 'oauth', 'saml', 'secret', 'x509'])
+    expect(ids).toEqual(['cookie', 'jwk', 'jwt', 'oauth', 'paseto', 'saml', 'secret', 'x509'])
   })
 
   it('exposes analyzers by id', () => {
@@ -16,6 +16,7 @@ describe('createDefaultRegistry', () => {
     expect(reg.get('jwk')?.id).toBe('jwk')
     expect(reg.get('oauth')?.id).toBe('oauth')
     expect(reg.get('cookie')?.id).toBe('cookie')
+    expect(reg.get('paseto')?.id).toBe('paseto')
     expect(reg.get('secret')?.id).toBe('secret')
   })
 })

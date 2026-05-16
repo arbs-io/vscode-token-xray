@@ -21,6 +21,7 @@ const ICON_FOR: Record<string, string> = {
   jwk: '$(symbol-key)',
   oauth: '$(warning)',
   cookie: '$(circle-large-outline)',
+  paseto: '$(shield)',
   secret: '$(error)',
 }
 
@@ -34,6 +35,7 @@ const TITLE_FOR: Record<string, (text: string) => string> = {
   jwk: (text: string) => (/"keys"\s*:/.test(text) ? '$(symbol-key) Inspect JWKS' : '$(symbol-key) Inspect JWK'),
   oauth: () => '$(warning) Inspect vendor token',
   cookie: () => '$(circle-large-outline) Inspect Set-Cookie',
+  paseto: () => '$(shield) Inspect PASETO token',
   secret: () => '$(error) Inspect secret',
 }
 
