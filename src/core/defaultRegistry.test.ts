@@ -13,6 +13,7 @@ describe('createDefaultRegistry', () => {
       'jwk',
       'jwt',
       'oauth',
+      'oidcDiscovery',
       'paseto',
       'pgp',
       'saml',
@@ -29,6 +30,7 @@ describe('createDefaultRegistry', () => {
     expect(reg.get('x509')?.id).toBe('x509')
     expect(reg.get('jwk')?.id).toBe('jwk')
     expect(reg.get('oauth')?.id).toBe('oauth')
+    expect(reg.get('oidcDiscovery')?.id).toBe('oidcDiscovery')
     expect(reg.get('cookie')?.id).toBe('cookie')
     expect(reg.get('paseto')?.id).toBe('paseto')
     expect(reg.get('basicAuth')?.id).toBe('basicAuth')

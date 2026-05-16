@@ -5,6 +5,7 @@ import { CsrAnalyzer } from '../analyzers/csr/analyzer'
 import { JwkAnalyzer } from '../analyzers/jwk/analyzer'
 import { JwtAnalyzer } from '../analyzers/jwt/analyzer'
 import { OAuthTokenAnalyzer } from '../analyzers/oauth/analyzer'
+import { OidcDiscoveryAnalyzer } from '../analyzers/oidcDiscovery/analyzer'
 import { PasetoAnalyzer } from '../analyzers/paseto/analyzer'
 import { PgpAnalyzer } from '../analyzers/pgp/analyzer'
 import { SamlAnalyzer } from '../analyzers/saml/analyzer'
@@ -20,6 +21,7 @@ export function createDefaultRegistry(): AnalyzerRegistry {
   registry.register(new X509Analyzer())
   registry.register(new JwkAnalyzer())
   registry.register(new OAuthTokenAnalyzer())
+  registry.register(new OidcDiscoveryAnalyzer())
   registry.register(new CookieAnalyzer())
   registry.register(new PasetoAnalyzer())
   registry.register(new BasicAuthAnalyzer())
