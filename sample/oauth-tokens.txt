@@ -1,0 +1,26 @@
+# Demo vendor tokens — every value below is fake (filler bytes, not a real key).
+# Open this file with the extension active and watch each line get a CodeLens
+# and a Diagnostic in the Problems panel.
+
+# GitHub
+ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+github_pat_0123456789ABCDEFGHIJKL_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ghu_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+ghs_cccccccccccccccccccccccccccccccccccc
+gho_dddddddddddddddddddddddddddddddddddd
+ghr_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+# Slack
+xoxb-1234567890-1234567890-1234567890-abc123def456
+xoxp-1234567890-1234567890-1234567890-abc123def456
+xoxa-2-1234567890-1234567890-1234567890-abc123def456
+xoxr-1234567890-1234567890-1234567890-abc123def456
+xapp-1-A1B2C3-1234567890-abcdef0123456789abcdef0123456789ab
+
+# Stripe (live keys flagged as errors, test keys as warnings, publishable as info)
+sk_live_aaaaaaaaaaaaaaaaaaaaaaaa
+sk_test_bbbbbbbbbbbbbbbbbbbbbbbb
+rk_live_cccccccccccccccccccccccc
+rk_test_dddddddddddddddddddddddd
+pk_live_eeeeeeeeeeeeeeeeeeeeeeee
+pk_test_ffffffffffffffffffffffff

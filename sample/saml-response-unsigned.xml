@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                ID="_unsigned_response"
+                Version="2.0"
+                IssueInstant="2026-01-01T12:00:00Z">
+  <saml:Issuer>https://idp.example.test/metadata</saml:Issuer>
+  <saml:Assertion ID="_unsigned_assertion" Version="2.0" IssueInstant="2026-01-01T12:00:00Z">
+    <saml:Issuer>https://idp.example.test/metadata</saml:Issuer>
+    <saml:Subject>
+      <saml:NameID>bob@example.test</saml:NameID>
+    </saml:Subject>
+    <saml:Conditions NotBefore="2026-01-01T12:00:00Z" NotOnOrAfter="2026-01-01T13:00:00Z"/>
+  </saml:Assertion>
+</samlp:Response>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                ID="_enc_response"
+                Version="2.0"
+                IssueInstant="2026-01-01T12:00:00Z">
+  <saml:Issuer>https://idp.example.test/metadata</saml:Issuer>
+  <saml:EncryptedAssertion>
+    <xenc:EncryptedData xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
+                        Type="http://www.w3.org/2001/04/xmlenc#Element">
+      <xenc:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes256-cbc"/>
+      <xenc:CipherData><xenc:CipherValue>BASE64_CIPHERTEXT_HERE</xenc:CipherValue></xenc:CipherData>
+    </xenc:EncryptedData>
+  </saml:EncryptedAssertion>
+</samlp:Response>
