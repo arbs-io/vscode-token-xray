@@ -148,6 +148,24 @@
           "items": {
             "type": "object"
           }
+        },
+        "tokenXray.secrets.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, secret-scanner findings (private keys, vendor API tokens, etc.) are published as diagnostics. Findings from JWT / SAML / X509 / JWK / OAuth / cookie analyzers are unaffected by this setting."
+        },
+        "tokenXray.secrets.exclude": {
+          "type": "array",
+          "default": [],
+          "description": "Gitignore-style glob patterns (relative to the workspace folder) for files where the secret scanner should be skipped. Only secret findings are filtered — other analyzers still run.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tokenXray.secrets.maxFileSizeBytes": {
+          "type": "number",
+          "default": 1048576,
+          "description": "Skip the secret scanner when a document's text length (in characters) exceeds this value. Defaults to 1 MiB. Other analyzers still run."
         }
       }
     },
