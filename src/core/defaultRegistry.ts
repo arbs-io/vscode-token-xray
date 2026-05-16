@@ -1,3 +1,4 @@
+import { BasicAuthAnalyzer } from '../analyzers/basicAuth/analyzer'
 import { CookieAnalyzer } from '../analyzers/cookie/analyzer'
 import { JwkAnalyzer } from '../analyzers/jwk/analyzer'
 import { JwtAnalyzer } from '../analyzers/jwt/analyzer'
@@ -17,6 +18,7 @@ export function createDefaultRegistry(): AnalyzerRegistry {
   registry.register(new OAuthTokenAnalyzer())
   registry.register(new CookieAnalyzer())
   registry.register(new PasetoAnalyzer())
+  registry.register(new BasicAuthAnalyzer())
   registry.register(new SecretAnalyzer())
   return registry
 }

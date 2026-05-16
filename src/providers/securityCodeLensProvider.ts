@@ -22,6 +22,7 @@ const ICON_FOR: Record<string, string> = {
   oauth: '$(warning)',
   cookie: '$(circle-large-outline)',
   paseto: '$(shield)',
+  basicAuth: '$(lock)',
   secret: '$(error)',
 }
 
@@ -36,6 +37,7 @@ const TITLE_FOR: Record<string, (text: string) => string> = {
   oauth: () => '$(warning) Inspect vendor token',
   cookie: () => '$(circle-large-outline) Inspect Set-Cookie',
   paseto: () => '$(shield) Inspect PASETO token',
+  basicAuth: () => '$(lock) Inspect Basic credentials',
   secret: () => '$(error) Inspect secret',
 }
 
