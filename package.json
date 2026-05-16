@@ -166,6 +166,11 @@
           "type": "number",
           "default": 1048576,
           "description": "Skip the secret scanner when a document's text length (in characters) exceeds this value. Defaults to 1 MiB. Other analyzers still run."
+        },
+        "tokenXray.secrets.codeActions.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, secret-scanner diagnostics offer Quick Fix code actions (Redact / Move to .env.example). Toggle off to silence the lightbulb on secret diagnostics."
         }
       }
     },
