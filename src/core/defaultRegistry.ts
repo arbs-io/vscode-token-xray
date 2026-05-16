@@ -2,6 +2,7 @@ import { AwsSigv4Analyzer } from '../analyzers/awsSigv4/analyzer'
 import { BasicAuthAnalyzer } from '../analyzers/basicAuth/analyzer'
 import { CookieAnalyzer } from '../analyzers/cookie/analyzer'
 import { CsrAnalyzer } from '../analyzers/csr/analyzer'
+import { HttpSignatureAnalyzer } from '../analyzers/httpSignature/analyzer'
 import { JwkAnalyzer } from '../analyzers/jwk/analyzer'
 import { JwtAnalyzer } from '../analyzers/jwt/analyzer'
 import { OAuthTokenAnalyzer } from '../analyzers/oauth/analyzer'
@@ -31,6 +32,7 @@ export function createDefaultRegistry(): AnalyzerRegistry {
   registry.register(new CsrAnalyzer())
   registry.register(new SshKeyAnalyzer())
   registry.register(new PgpAnalyzer())
+  registry.register(new HttpSignatureAnalyzer())
   registry.register(new SecretAnalyzer())
   return registry
 }

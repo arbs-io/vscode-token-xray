@@ -29,6 +29,7 @@ const ICON_FOR: Record<string, string> = {
   csr: '$(file-symlink-file)',
   sshKey: '$(symbol-key)',
   pgp: '$(lock)',
+  httpSignature: '$(key)',
   secret: '$(error)',
 }
 
@@ -50,6 +51,7 @@ const TITLE_FOR: Record<string, (text: string) => string> = {
   csr: () => '$(file-symlink-file) Inspect CSR',
   sshKey: () => '$(symbol-key) Inspect SSH key',
   pgp: () => '$(lock) Inspect PGP block',
+  httpSignature: () => '$(key) Inspect HTTP signature',
   secret: () => '$(error) Inspect secret',
 }
 

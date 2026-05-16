@@ -10,6 +10,7 @@ describe('createDefaultRegistry', () => {
       'basicAuth',
       'cookie',
       'csr',
+      'httpSignature',
       'jwk',
       'jwt',
       'oauth',
@@ -40,6 +41,7 @@ describe('createDefaultRegistry', () => {
     expect(reg.get('csr')?.id).toBe('csr')
     expect(reg.get('sshKey')?.id).toBe('sshKey')
     expect(reg.get('pgp')?.id).toBe('pgp')
+    expect(reg.get('httpSignature')?.id).toBe('httpSignature')
     expect(reg.get('secret')?.id).toBe('secret')
   })
 })
