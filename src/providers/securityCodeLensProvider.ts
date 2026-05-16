@@ -24,6 +24,7 @@ const ICON_FOR: Record<string, string> = {
   paseto: '$(shield)',
   basicAuth: '$(lock)',
   awsSigv4: '$(key)',
+  csr: '$(file-symlink-file)',
   secret: '$(error)',
 }
 
@@ -40,6 +41,7 @@ const TITLE_FOR: Record<string, (text: string) => string> = {
   paseto: () => '$(shield) Inspect PASETO token',
   basicAuth: () => '$(lock) Inspect Basic credentials',
   awsSigv4: () => '$(key) Inspect AWS SigV4',
+  csr: () => '$(file-symlink-file) Inspect CSR',
   secret: () => '$(error) Inspect secret',
 }
 

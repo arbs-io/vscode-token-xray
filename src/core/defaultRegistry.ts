@@ -1,6 +1,7 @@
 import { AwsSigv4Analyzer } from '../analyzers/awsSigv4/analyzer'
 import { BasicAuthAnalyzer } from '../analyzers/basicAuth/analyzer'
 import { CookieAnalyzer } from '../analyzers/cookie/analyzer'
+import { CsrAnalyzer } from '../analyzers/csr/analyzer'
 import { JwkAnalyzer } from '../analyzers/jwk/analyzer'
 import { JwtAnalyzer } from '../analyzers/jwt/analyzer'
 import { OAuthTokenAnalyzer } from '../analyzers/oauth/analyzer'
@@ -21,6 +22,7 @@ export function createDefaultRegistry(): AnalyzerRegistry {
   registry.register(new PasetoAnalyzer())
   registry.register(new BasicAuthAnalyzer())
   registry.register(new AwsSigv4Analyzer())
+  registry.register(new CsrAnalyzer())
   registry.register(new SecretAnalyzer())
   return registry
 }
