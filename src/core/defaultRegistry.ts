@@ -9,6 +9,7 @@ import { OidcDiscoveryAnalyzer } from '../analyzers/oidcDiscovery/analyzer'
 import { PasetoAnalyzer } from '../analyzers/paseto/analyzer'
 import { PgpAnalyzer } from '../analyzers/pgp/analyzer'
 import { SamlAnalyzer } from '../analyzers/saml/analyzer'
+import { SamlMetadataAnalyzer } from '../analyzers/samlMetadata/analyzer'
 import { SecretAnalyzer } from '../analyzers/secrets/analyzer'
 import { SshKeyAnalyzer } from '../analyzers/sshKey/analyzer'
 import { X509Analyzer } from '../analyzers/x509/analyzer'
@@ -18,6 +19,7 @@ export function createDefaultRegistry(): AnalyzerRegistry {
   const registry = new AnalyzerRegistry()
   registry.register(new JwtAnalyzer())
   registry.register(new SamlAnalyzer())
+  registry.register(new SamlMetadataAnalyzer())
   registry.register(new X509Analyzer())
   registry.register(new JwkAnalyzer())
   registry.register(new OAuthTokenAnalyzer())

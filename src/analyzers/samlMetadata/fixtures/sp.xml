@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                     xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                     entityID="https://sp.example.test/">
+  <ds:Signature>
+    <ds:SignedInfo>
+      <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+      <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+      <ds:Reference URI="">
+        <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+        <ds:DigestValue>placeholder</ds:DigestValue>
+      </ds:Reference>
+    </ds:SignedInfo>
+    <ds:SignatureValue>placeholder</ds:SignatureValue>
+  </ds:Signature>
+  <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing">
+      <ds:KeyInfo>
+        <ds:X509Data>
+          <ds:X509Certificate>MIIDmDCCAoCgAwIBAgIUQf+PjcchJeGRFb8hSPDDVnd96XYwDQYJKoZIhvcNAQELBQAwPjEaMBgGA1UEAwwRZ29vZC5leGFtcGxlLnRlc3QxEzARBgNVBAoMCkV4YW1wbGUgQ28xCzAJBgNVBAYTAlVTMB4XDTI2MDUxNjE2MjAyMFoXDTM2MDUxMzE2MjAyMFowPjEaMBgGA1UEAwwRZ29vZC5leGFtcGxlLnRlc3QxEzARBgNVBAoMCkV4YW1wbGUgQ28xCzAJBgNVBAYTAlVTMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2WpxbJTiQx9DkETg3/lYk2/yjFcsxiU3d8vU7Es4kDYszvS8ftFS9rjVRJqMIhHsNZuOENR9PaIrugVJ0ZGmE1vvwLNQ8AmBLewgjbfNR/HKrNk+li0AdSOsnUYD4sYJZ5z+CQqw6mwZFjyHaO2wwT9+yps+CzHqc6MRomcl0kfcZYKNzNYbw2FdJxHoGKfn5NBhDRi2beZq9Hk60MAmcGA6JoaVl4IGSAN0PuK31AkdS/bZCNqP/H6uihrfJOvHDAvqvEeDJ+ps8WumfEj/8dJLyVYalBrqOI+N7w6LzAGywZXjQyaHi+oERM3eF0Vq4dDCKvZKXl6ohhjHOQR8MQIDAQABo4GNMIGKMB0GA1UdDgQWBBTpcmpQpDUx+dUOkwICfjwb7aSguDAfBgNVHSMEGDAWgBTpcmpQpDUx+dUOkwICfjwb7aSguDAPBgNVHRMBAf8EBTADAQH/MDcGA1UdEQQwMC6CEWdvb2QuZXhhbXBsZS50ZXN0ghMqLmdvb2QuZXhhbXBsZS50ZXN0hwQKAAABMA0GCSqGSIb3DQEBCwUAA4IBAQCAE0VHGWsa6k/AXMCMUw9bHAG0PazCPGbm8QizKL9BLp69xI9lckPEL9zueCtkv3p9R7a6ytmoOfzqPlFx875cIoLDooic1TXvJ2NSsVLMAeFI7vzYPKHEz16/RhNMGd7FO7LYurZU1X7BvSHBsUJ09dlVtAN9hK2h+mMg35bORj8QdD4rOkQgNmWLZC5pjYd130KOU0qqb+2tdhpKgMi/iUWZ/ST3GIrgXqdw6o3wDuahZ6SlAIyzWuHZtA1o3m7IGodSFbY/6w7F79j+fF4kz5bwLE3zk3xfi9P22KVACoftPf5zJ+FkahRey+2tXE4JpanULhTcd0BaaaN7VbuJ</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+    <md:AssertionConsumerService index="0" isDefault="true"
+                                  Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                                  Location="https://sp.example.test/acs"/>
+    <md:AssertionConsumerService index="1"
+                                  Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact"
+                                  Location="https://sp.example.test/acs/artifact"/>
+  </md:SPSSODescriptor>
+</md:EntityDescriptor>

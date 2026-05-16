@@ -17,6 +17,7 @@ describe('createDefaultRegistry', () => {
       'paseto',
       'pgp',
       'saml',
+      'samlMetadata',
       'secret',
       'sshKey',
       'x509',
@@ -27,6 +28,7 @@ describe('createDefaultRegistry', () => {
     const reg = createDefaultRegistry()
     expect(reg.get('jwt')?.id).toBe('jwt')
     expect(reg.get('saml')?.id).toBe('saml')
+    expect(reg.get('samlMetadata')?.id).toBe('samlMetadata')
     expect(reg.get('x509')?.id).toBe('x509')
     expect(reg.get('jwk')?.id).toBe('jwk')
     expect(reg.get('oauth')?.id).toBe('oauth')

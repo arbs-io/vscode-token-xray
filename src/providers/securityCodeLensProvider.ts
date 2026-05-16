@@ -17,6 +17,7 @@ const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-userdata'])
 const ICON_FOR: Record<string, string> = {
   jwt: '$(shield)',
   saml: '$(key)',
+  samlMetadata: '$(key)',
   x509: '$(verified)',
   jwk: '$(symbol-key)',
   oauth: '$(warning)',
@@ -37,6 +38,7 @@ const TITLE_FOR: Record<string, (text: string) => string> = {
     return segments === 5 ? '$(shield) Inspect JWE token' : '$(shield) Inspect JWT token'
   },
   saml: () => '$(key) Inspect SAML assertion',
+  samlMetadata: () => '$(key) Inspect SAML metadata',
   x509: () => '$(verified) Inspect X.509 certificate',
   jwk: (text: string) => (/"keys"\s*:/.test(text) ? '$(symbol-key) Inspect JWKS' : '$(symbol-key) Inspect JWK'),
   oauth: () => '$(warning) Inspect vendor token',
