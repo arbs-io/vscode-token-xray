@@ -1,5 +1,6 @@
 import { SecretRule } from './types'
 import { AI_SECRET_RULES } from './vendorRules/ai'
+import { ATLASSIAN_SECRET_RULES } from './vendorRules/atlassian'
 import { AUTH0_SECRET_RULES } from './vendorRules/auth0'
 import { AWS_SECRET_RULES } from './vendorRules/aws'
 import { AZURE_SECRET_RULES } from './vendorRules/azure'
@@ -35,6 +36,7 @@ export const BUILT_IN_SECRET_RULES: SecretRule[] = [
   ...AI_SECRET_RULES,
   ...DBSTRING_SECRET_RULES,
   ...VAULT_SECRET_RULES,
+  ...ATLASSIAN_SECRET_RULES,
   ...GENERIC_SECRET_RULES,
 ]
 
