@@ -15,6 +15,7 @@ import { GITLAB_SECRET_RULES } from './vendorRules/gitlab'
 import { OBSERVABILITY_SECRET_RULES } from './vendorRules/observability'
 import { OKTA_SECRET_RULES } from './vendorRules/okta'
 import { PAYMENTS_SECRET_RULES } from './vendorRules/payments'
+import { PRODUCTIVITY_SECRET_RULES } from './vendorRules/productivity'
 import { REGISTRIES_SECRET_RULES } from './vendorRules/registries'
 import { SAILPOINT_SECRET_RULES } from './vendorRules/sailpoint'
 import { VAULT_SECRET_RULES } from './vendorRules/vault'
@@ -49,6 +50,7 @@ export const BUILT_IN_SECRET_RULES: SecretRule[] = [
   ...REGISTRIES_SECRET_RULES,
   ...CI_SECRET_RULES,
   ...PAYMENTS_SECRET_RULES,
+  ...PRODUCTIVITY_SECRET_RULES,
   ...GENERIC_SECRET_RULES,
 ]
 
