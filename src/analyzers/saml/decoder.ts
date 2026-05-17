@@ -1,4 +1,4 @@
-import { inflateRawSync } from 'zlib'
+import { inflateRawSync } from 'node:zlib'
 import { XMLParser } from 'fast-xml-parser'
 
 export interface SamlSubject {

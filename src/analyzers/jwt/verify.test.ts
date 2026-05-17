@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomBytes } from 'crypto'
+import { generateKeyPairSync, randomBytes } from 'node:crypto'
 import { exportJWK, exportSPKI, KeyObject, SignJWT } from 'jose'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { verifyJwt, VerifyKeySource } from './verify'

@@ -71,7 +71,7 @@ export function toRedirectEncoded(text: string): string {
   // HTTP-Redirect binding: DEFLATE then base64 then URL-encode.
   // Using zlib.deflateRawSync to produce raw deflate (no zlib header).
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { deflateRawSync } = require('zlib') as typeof import('zlib')
+  const { deflateRawSync } = require('node:zlib') as typeof import('node:zlib')
   const deflated = deflateRawSync(Buffer.from(text, 'utf8'))
   return encodeURIComponent(deflated.toString('base64'))
 }

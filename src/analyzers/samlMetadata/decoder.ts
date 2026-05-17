@@ -1,4 +1,4 @@
-import { X509Certificate } from 'crypto'
+import { X509Certificate } from 'node:crypto'
 import { XMLParser } from 'fast-xml-parser'
 
 /**

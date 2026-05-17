@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from 'fs'
-import { join } from 'path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createDefaultRegistry } from './defaultRegistry'
 import { scanDocument } from './scanDocument'

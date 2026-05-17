@@ -1,4 +1,4 @@
-import { X509Certificate, KeyObject } from 'crypto'
+import { X509Certificate, KeyObject } from 'node:crypto'
 import { detectSignatureAlgorithm } from './sigalg'
 
 export interface DecodedX509 {
