@@ -31,44 +31,52 @@ interface InternalHit {
   range: { start: number; end: number }
 }
 
-function findInternalHits(text: string): InternalHit[] {
-  if (!text) return []
-  const hits: InternalHit[] = []
+function createClaimer(): (start: number, end: number) => boolean {
   const claimed: Array<{ start: number; end: number }> = []
-
-  const claim = (start: number, end: number): boolean => {
+  return (start, end) => {
     for (const c of claimed) {
       if (start < c.end && c.start < end) return false
     }
     claimed.push({ start, end })
     return true
   }
+}
 
+function collectHeaderHits(text: string, claim: (s: number, e: number) => boolean, hits: InternalHit[]): void {
   HEADER_REGEX.lastIndex = 0
   let m: RegExpExecArray | null
   while ((m = HEADER_REGEX.exec(text)) !== null) {
     const start = m.index
     const end = start + m[0].length
-    if (!claim(start, end)) continue
-    if (!parseSigv4Authorization(m[0])) continue
-    hits.push({ text: m[0], range: { start, end } })
+    if (claim(start, end) && parseSigv4Authorization(m[0])) {
+      hits.push({ text: m[0], range: { start, end } })
+    }
   }
+}
 
+function hasAllSigv4Markers(inner: string): boolean {
+  return /\bCredential\s*=/.test(inner) && /\bSignedHeaders\s*=/.test(inner) && /\bSignature\s*=/.test(inner)
+}
+
+function collectStandaloneHits(text: string, claim: (s: number, e: number) => boolean, hits: InternalHit[]): void {
   STANDALONE_REGEX.lastIndex = 0
+  let m: RegExpExecArray | null
   while ((m = STANDALONE_REGEX.exec(text)) !== null) {
     const inner = m[1]
     const start = m.index + (m[0].length - inner.length)
     const end = start + inner.length
-    if (!claim(start, end)) continue
-    // Require all three SigV4 markers on the same line — the spec explicitly
-    // calls this out for the standalone form.
-    if (!/\bCredential\s*=/.test(inner)) continue
-    if (!/\bSignedHeaders\s*=/.test(inner)) continue
-    if (!/\bSignature\s*=/.test(inner)) continue
-    if (!parseSigv4Authorization(inner)) continue
-    hits.push({ text: inner, range: { start, end } })
+    if (claim(start, end) && hasAllSigv4Markers(inner) && parseSigv4Authorization(inner)) {
+      hits.push({ text: inner, range: { start, end } })
+    }
   }
+}
 
+function findInternalHits(text: string): InternalHit[] {
+  if (!text) return []
+  const hits: InternalHit[] = []
+  const claim = createClaimer()
+  collectHeaderHits(text, claim, hits)
+  collectStandaloneHits(text, claim, hits)
   hits.sort((a, b) => a.range.start - b.range.start)
   return hits
 }
