@@ -13,6 +13,7 @@ import {
   workspace,
 } from 'vscode'
 import { createDefaultRegistry } from '../core/defaultRegistry'
+import { applyDisableComments, FindingWithLocation } from '../core/disableComments'
 import { findingsToInlayDtos, HitRange } from '../core/inlayHints'
 import {
   DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES,
@@ -92,7 +93,19 @@ export class SecurityInlayHintsProvider implements InlayHintsProvider {
         endColumn: hit.endColumn,
       }
 
-      for (const dto of findingsToInlayDtos(result, hitRange)) {
+      // Honour inline `tokenxray-disable-*` directives so the inlay
+      // hint mapper never sees suppressed findings.
+      const located: FindingWithLocation[] = (result.findings ?? []).map((finding) => ({
+        ...finding,
+        startLine: hit.startLine,
+      }))
+      const kept = applyDisableComments(located, text)
+      const filteredResult: AnalysisResult = {
+        ...result,
+        findings: kept.map(({ startLine: _ignored, ...rest }) => rest),
+      }
+
+      for (const dto of findingsToInlayDtos(filteredResult, hitRange)) {
         const hint = new InlayHint(
           new Position(dto.position.line, dto.position.column),
           ` ${dto.label}`,

@@ -81,4 +81,79 @@ describe('diagnosticsAcrossRegistry', () => {
     const hit = out.find((d) => d.source === 'rangeless')
     expect(hit?.range.startLine).toBe(0)
   })
+
+  it('honours `tokenxray-disable-next-line` for the line directly below', async () => {
+    const token = `${b64u({ alg: 'none' })}.${b64u({ sub: 'x' })}.`
+    const text = `// tokenxray-disable-next-line jwt.alg.none\n${token}`
+    const out = await diagnosticsAcrossRegistry(text, reg)
+    expect(out.every((d) => d.code !== 'jwt.alg.none')).toBe(true)
+  })
+
+  it('honours `tokenxray-disable-file` across the document', async () => {
+    const token = `${b64u({ alg: 'none' })}.${b64u({ sub: 'x' })}.`
+    const text = `// tokenxray-disable-file jwt.alg.none\nfiller\n${token}`
+    const out = await diagnosticsAcrossRegistry(text, reg)
+    expect(out.every((d) => d.code !== 'jwt.alg.none')).toBe(true)
+  })
+
+  it('keeps unrelated findings on a line that suppresses one rule', async () => {
+    // A document with two analyzers firing on the same target line —
+    // only one is silenced, the other should still surface. The custom
+    // analyzers anchor their range on a fixed `target` substring so the
+    // computed startLine matches the line the directive points at.
+    const reg2 = createDefaultRegistry()
+    const target = 'target-marker'
+    const detect = (t: string) => {
+      const idx = t.indexOf(target)
+      return idx < 0 ? [] : [{ text: target, range: { start: idx, end: idx + target.length } }]
+    }
+    reg2.register({
+      id: 'first',
+      name: 'first',
+      detect,
+      analyze: () => ({
+        analyzerId: 'first',
+        kind: 'demo',
+        sections: [],
+        findings: [{ id: 'first.flagged', severity: 'warning' as const, message: 'flagged' }],
+      }),
+    })
+    reg2.register({
+      id: 'second',
+      name: 'second',
+      detect,
+      analyze: () => ({
+        analyzerId: 'second',
+        kind: 'demo',
+        sections: [],
+        findings: [{ id: 'second.kept', severity: 'warning' as const, message: 'kept' }],
+      }),
+    })
+    const text = `// tokenxray-disable-next-line first.flagged\n${target}\n`
+    const out = await diagnosticsAcrossRegistry(text, reg2)
+    expect(out.some((d) => d.code === 'second.kept')).toBe(true)
+    expect(out.every((d) => d.code !== 'first.flagged')).toBe(true)
+  })
+
+  it('preserves duplicate findings that happen to share id + line + message', async () => {
+    // Two analyzer registrations emit the same finding shape on the
+    // same line. The dedup-aware filter must not collapse them.
+    const reg2 = createDefaultRegistry()
+    for (const id of ['twinA', 'twinB'] as const) {
+      reg2.register({
+        id,
+        name: id,
+        detect: (t) => (t.length > 0 ? [{ text: t, range: { start: 0, end: t.length } }] : []),
+        analyze: () => ({
+          analyzerId: id,
+          kind: 'demo',
+          sections: [],
+          findings: [{ id: 'demo.shared', severity: 'warning' as const, message: 'shared' }],
+        }),
+      })
+    }
+    const out = await diagnosticsAcrossRegistry('plain text body', reg2)
+    const sources = out.filter((d) => d.code === 'demo.shared').map((d) => d.source).sort()
+    expect(sources).toEqual(['twinA', 'twinB'])
+  })
 })

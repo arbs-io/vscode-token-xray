@@ -12,6 +12,7 @@ import {
 } from 'vscode'
 import { buildHoverMarkdown } from '../core/buildHoverMarkdown'
 import { createDefaultRegistry } from '../core/defaultRegistry'
+import { applyDisableComments, FindingWithLocation } from '../core/disableComments'
 import { AnalyzerRegistry } from '../core/registry'
 import {
   DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES,
@@ -75,7 +76,19 @@ class GenericHoverProvider implements HoverProvider {
 
     try {
       const result = await Promise.resolve(analyzer.analyze(match))
-      const md = new MarkdownString(buildHoverMarkdown(result))
+      // Honour inline `tokenxray-disable-*` directives: drop any
+      // findings that are suppressed for this hit's line before we
+      // render the hover preview.
+      const located: FindingWithLocation[] = (result.findings ?? []).map((finding) => ({
+        ...finding,
+        startLine: hit.startLine,
+      }))
+      const kept = applyDisableComments(located, text)
+      const filtered = {
+        ...result,
+        findings: kept.map(({ startLine: _ignored, ...rest }) => rest),
+      }
+      const md = new MarkdownString(buildHoverMarkdown(filtered))
       md.supportThemeIcons = true
       return new Hover(md)
     } catch {

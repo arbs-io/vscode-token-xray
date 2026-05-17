@@ -11,6 +11,7 @@ import {
   workspace,
 } from 'vscode'
 import { createDefaultRegistry } from '../core/defaultRegistry'
+import { applyDisableComments, FindingWithLocation } from '../core/disableComments'
 import {
   buildDocumentSymbolDtos,
   DocumentSymbolDto,
@@ -80,6 +81,15 @@ export class SecurityDocumentSymbolsProvider implements DocumentSymbolProvider {
         continue
       }
 
+      // Honour inline `tokenxray-disable-*` directives so the symbol
+      // "N finding(s)" detail line never counts suppressed findings.
+      const located: FindingWithLocation[] = (result.findings ?? []).map((finding) => ({
+        ...finding,
+        startLine: hit.startLine,
+      }))
+      const kept = applyDisableComments(located, text)
+      const filteredFindings = kept.map(({ startLine: _ignored, ...rest }) => rest)
+
       enriched.push({
         analyzerId: hit.analyzerId,
         analyzerName: hit.analyzerName,
@@ -89,7 +99,7 @@ export class SecurityDocumentSymbolsProvider implements DocumentSymbolProvider {
         endLine: hit.endLine,
         endColumn: hit.endColumn,
         firstSection: result.sections?.[0],
-        findings: result.findings,
+        findings: filteredFindings,
       })
     }
 

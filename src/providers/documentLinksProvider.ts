@@ -10,6 +10,7 @@ import {
   workspace,
 } from 'vscode'
 import { createDefaultRegistry } from '../core/defaultRegistry'
+import { applyDisableComments, FindingWithLocation } from '../core/disableComments'
 import { extractDocumentLinks, HitRange } from '../core/documentLinks'
 import { scanDocument } from '../core/scanDocument'
 import { DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES } from '../core/scanText'
@@ -74,7 +75,19 @@ export class SecurityDocumentLinksProvider implements DocumentLinkProvider {
         endColumn: hit.endColumn,
       }
 
-      for (const dto of extractDocumentLinks(result, hitRange, hit.text)) {
+      // Honour inline `tokenxray-disable-*` directives so document
+      // links derived from suppressed findings (`docUrl`) do not leak.
+      const located: FindingWithLocation[] = (result.findings ?? []).map((finding) => ({
+        ...finding,
+        startLine: hit.startLine,
+      }))
+      const kept = applyDisableComments(located, text)
+      const filteredResult: AnalysisResult = {
+        ...result,
+        findings: kept.map(({ startLine: _ignored, ...rest }) => rest),
+      }
+
+      for (const dto of extractDocumentLinks(filteredResult, hitRange, hit.text)) {
         try {
           const link = new DocumentLink(
             new Range(

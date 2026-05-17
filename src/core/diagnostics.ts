@@ -1,5 +1,6 @@
 import { Finding, Severity } from './types'
 import { AnalyzerRegistry } from './registry'
+import { applyDisableComments, FindingWithLocation } from './disableComments'
 
 export type DiagnosticSeverityDto = 'error' | 'warning' | 'information' | 'hint'
 
@@ -44,7 +45,8 @@ export async function diagnosticsAcrossRegistry(
 ): Promise<DiagnosticDto[]> {
   if (!text) return []
   const lineStarts = computeLineStarts(text)
-  const out: DiagnosticDto[] = []
+  type Pending = { finding: Finding; analyzerId: string; range: DiagnosticRangeDto }
+  const pending: Pending[] = []
 
   for (const analyzer of registry.list()) {
     for (const match of analyzer.detect(text)) {
@@ -54,7 +56,7 @@ export async function diagnosticsAcrossRegistry(
           ? rangeForOffsets(match.range.start, match.range.end, lineStarts, text)
           : rangeForLine(0, text.length)
         for (const finding of result.findings) {
-          out.push(findingToDiagnostic(finding, analyzer.id, range))
+          pending.push({ finding, analyzerId: analyzer.id, range })
         }
       } catch {
         // analyzer can't decode this match — skip
@@ -62,6 +64,34 @@ export async function diagnosticsAcrossRegistry(
     }
   }
 
+  if (pending.length === 0) return []
+
+  // Apply inline-disable-comments at the registry boundary so all
+  // downstream consumers (diagnostics, code lens, tree view, status
+  // bar) inherit the same suppression rules. Hover / inlay-hints /
+  // document-symbols / document-links re-run the same filter against
+  // each hit's findings before they map them to provider DTOs.
+  //
+  // The filter is positional (rule id + line), so we annotate each
+  // pending finding with its index and ask the pure filter to preserve
+  // those tags — that lets us round-trip back to the original DTO
+  // without dropping duplicates that happen to share id + line.
+  type TaggedFinding = FindingWithLocation & { __idx: number }
+  const located: TaggedFinding[] = pending.map((p, idx) => ({
+    ...p.finding,
+    startLine: p.range.startLine,
+    __idx: idx,
+  }))
+  const kept = applyDisableComments(located, text) as TaggedFinding[]
+  const keepIndices = new Set<number>()
+  for (const tagged of kept) keepIndices.add(tagged.__idx)
+
+  const out: DiagnosticDto[] = []
+  for (let i = 0; i < pending.length; i++) {
+    if (!keepIndices.has(i)) continue
+    const p = pending[i]
+    out.push(findingToDiagnostic(p.finding, p.analyzerId, p.range))
+  }
   return out
 }
 
