@@ -31,19 +31,19 @@ const SEVERITY_FROM_DIAGNOSTIC: Record<DiagnosticSeverity, Severity> = {
  * Only `tokenXray`-sourced diagnostics are forwarded — the status bar
  * should never reflect findings from other extensions.
  */
+function diagnosticCodeToId(code: Diagnostic['code']): string {
+  if (typeof code === 'string') return code
+  if (typeof code === 'number') return String(code)
+  if (code && typeof code === 'object' && 'value' in code) return String(code.value)
+  return 'unknown'
+}
+
 function diagnosticsToFindings(diagnostics: readonly Diagnostic[]): Finding[] {
   const out: Finding[] = []
   for (const diag of diagnostics) {
     if (diag.source !== DIAGNOSTIC_SOURCE) continue
     const severity = SEVERITY_FROM_DIAGNOSTIC[diag.severity] ?? 'info'
-    const id = typeof diag.code === 'string'
-      ? diag.code
-      : typeof diag.code === 'number'
-        ? String(diag.code)
-        : (diag.code && typeof diag.code === 'object' && 'value' in diag.code
-          ? String((diag.code as { value: string | number }).value)
-          : 'unknown')
-    out.push({ id, severity, message: diag.message })
+    out.push({ id: diagnosticCodeToId(diag.code), severity, message: diag.message })
   }
   return out
 }
@@ -55,14 +55,15 @@ function diagnosticsToFindings(diagnostics: readonly Diagnostic[]): Finding[] {
  * detail with a single mouseover.
  */
 function buildTooltip(errors: number, warnings: number, infos: number): MarkdownString {
-  const lines: string[] = []
-  lines.push('**Token X-Ray findings**')
-  lines.push('')
-  lines.push(`- Errors: ${errors}`)
-  lines.push(`- Warnings: ${warnings}`)
-  lines.push(`- Info: ${infos}`)
-  lines.push('')
-  lines.push('Click to open the Problems panel.')
+  const lines = [
+    '**Token X-Ray findings**',
+    '',
+    `- Errors: ${errors}`,
+    `- Warnings: ${warnings}`,
+    `- Info: ${infos}`,
+    '',
+    'Click to open the Problems panel.',
+  ]
   const md = new MarkdownString(lines.join('\n'))
   md.isTrusted = false
   return md

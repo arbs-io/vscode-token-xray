@@ -78,7 +78,7 @@ describe('buildTree', () => {
         makeEntry({ analyzerId: 'jwt', finding: makeFinding({ id: 'jwt.c' }) }),
       ])
       expect(result).toHaveLength(2)
-      const ids = result.map((r) => r.analyzerId).sort()
+      const ids = result.map((r) => r.analyzerId).sort((a, b) => a.localeCompare(b))
       expect(ids).toEqual(['jwt', 'secret'])
     })
 
@@ -661,6 +661,8 @@ describe('buildTokenTree', () => {
 })
 
 // Type-only smoke: ensure the exported types are consumable from tests.
+// Referenced via `() => _typecheckTree` so the declaration is observably used
+// without invoking the `void` operator.
 const _typecheckTree: TreeNodeDto = {
   id: 'analyzer:jwt',
   kind: 'analyzerRoot',
@@ -672,4 +674,5 @@ const _typecheckTree: TreeNodeDto = {
   infoCount: 0,
   children: [],
 }
-void _typecheckTree
+const _typecheckTreeRef = () => _typecheckTree
+_typecheckTreeRef

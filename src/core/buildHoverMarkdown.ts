@@ -39,14 +39,12 @@ export function buildHoverMarkdown(result: AnalysisResult): string {
   for (const section of result.sections) {
     const block = renderSection(section)
     if (block) {
-      lines.push('')
-      lines.push(block)
+      lines.push('', block)
     }
   }
 
   if (result.findings.length > 0) {
-    lines.push('')
-    lines.push('### Findings')
+    lines.push('', '### Findings')
     for (const finding of result.findings) {
       lines.push(renderFinding(finding))
     }
@@ -68,10 +66,7 @@ function renderSection(section: Section): string | undefined {
     // `| --- |` separator without content.
     return `### ${section.title}`
   }
-  const lines: string[] = []
-  lines.push(`### ${section.title}`)
-  lines.push('| Key | Value |')
-  lines.push('| --- | --- |')
+  const lines: string[] = [`### ${section.title}`, '| Key | Value |', '| --- | --- |']
   for (const row of section.rows) {
     lines.push(renderRow(row))
   }
@@ -97,11 +92,11 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined) return '_(none)_'
   if (typeof value === 'string') return escapeCell(value)
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  if (Array.isArray(value)) return escapeCell(value.map((v) => String(v)).join(', '))
+  if (Array.isArray(value)) return escapeCell(value.map(String).join(', '))
   try {
     return '`' + JSON.stringify(value) + '`'
   } catch {
-    return escapeCell(String(value))
+    return escapeCell('[unserializable value]')
   }
 }
 
@@ -114,7 +109,7 @@ function formatValue(value: unknown): string {
 function escapeCell(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
-    .replace(/\|/g, '\\|')
+    .replace(/\|/g, String.raw`\|`)
     .replace(/\r?\n/g, '<br>')
 }
 

@@ -17,7 +17,7 @@ const NPM_ACCESS_TOKEN: SecretRule = {
   id: 'secret.npm.accessToken',
   vendor: 'npm',
   name: 'npm access token (npm_…)',
-  pattern: /(?<![A-Za-z0-9_])npm_[A-Za-z0-9]{36}(?![A-Za-z0-9])/g,
+  pattern: /(?<!\w)npm_[A-Za-z0-9]{36}(?![A-Za-z0-9])/g,
   severity: 'error',
   description:
     'npm access token. Grants publish/yank rights for packages owned by the issuing user — revoke immediately if leaked.',

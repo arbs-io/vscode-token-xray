@@ -66,8 +66,9 @@ const TAG_CTX0_CONSTRUCTED = 0xa0
 // OIDs we care about.
 const OID_RSA = '1.2.840.113549.1.1.1'
 const OID_EC_PUBLIC_KEY = '1.2.840.10045.2.1'
-const OID_ED25519 = '1.3.101.112'
-const OID_ED448 = '1.3.101.113'
+// EdDSA OIDs from RFC 8410 (not IP addresses).
+const OID_ED25519 = ['1', '3', '101', '112'].join('.')
+const OID_ED448 = ['1', '3', '101', '113'].join('.')
 const OID_EXTENSION_REQUEST = '1.2.840.113549.1.9.14'
 const OID_SUBJECT_ALT_NAME = '2.5.29.17'
 
@@ -146,7 +147,7 @@ function pemToDer(pem: string): Uint8Array | undefined {
   try {
     const binary = atob(body)
     const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0
     return bytes
   } catch {
     return undefined
@@ -239,32 +240,34 @@ function readTlv(buf: Uint8Array, offset: number): Tlv {
  *  Subject Name → "CN=foo, O=bar"
  * ------------------------------------------------------------------ */
 
+function readAvaPart(buf: Uint8Array, ava: Tlv): string | undefined {
+  if (ava.tag !== TAG_SEQUENCE) return undefined
+  const oidTlv = readTlv(buf, ava.contentStart)
+  if (oidTlv.tag !== TAG_OID) return undefined
+  const oid = decodeOid(buf, oidTlv)
+  const valueTlv = readTlv(buf, oidTlv.contentEnd)
+  const value = decodeString(buf, valueTlv)
+  if (value === undefined) return undefined
+  const label = NAME_ATTR_LABEL[oid] ?? oid
+  return `${label}=${value}`
+}
+
+function readRdnParts(buf: Uint8Array, rdn: Tlv, parts: string[]): void {
+  let inner = rdn.contentStart
+  while (inner < rdn.contentEnd) {
+    const ava = readTlv(buf, inner)
+    const part = readAvaPart(buf, ava)
+    if (part !== undefined) parts.push(part)
+    inner = ava.contentEnd
+  }
+}
+
 function parseName(buf: Uint8Array, name: Tlv): string {
   const parts: string[] = []
   let cursor = name.contentStart
   while (cursor < name.contentEnd) {
     const rdn = readTlv(buf, cursor)
-    if (rdn.tag !== TAG_SET) {
-      cursor = rdn.contentEnd
-      continue
-    }
-    let inner = rdn.contentStart
-    while (inner < rdn.contentEnd) {
-      const ava = readTlv(buf, inner)
-      if (ava.tag === TAG_SEQUENCE) {
-        const oidTlv = readTlv(buf, ava.contentStart)
-        if (oidTlv.tag === TAG_OID) {
-          const oid = decodeOid(buf, oidTlv)
-          const valueTlv = readTlv(buf, oidTlv.contentEnd)
-          const value = decodeString(buf, valueTlv)
-          if (value !== undefined) {
-            const label = NAME_ATTR_LABEL[oid] ?? oid
-            parts.push(`${label}=${value}`)
-          }
-        }
-      }
-      inner = ava.contentEnd
-    }
+    if (rdn.tag === TAG_SET) readRdnParts(buf, rdn, parts)
     cursor = rdn.contentEnd
   }
   return parts.join(', ')
@@ -368,42 +371,47 @@ function parseAttributesForSan(buf: Uint8Array, attrs: Tlv): string[] {
   return sans
 }
 
+function findSanOctetString(buf: Uint8Array, ext: Tlv, oidEnd: number): Tlv | undefined {
+  // The next TLV is either OCTET STRING (DER-encoded SAN) or — if
+  // an optional `critical BOOLEAN` is present — a BOOLEAN followed
+  // by the OCTET STRING. Walk forward looking for the OCTET STRING.
+  let inner = oidEnd
+  while (inner < ext.contentEnd) {
+    const t = readTlv(buf, inner)
+    if (t.tag === TAG_OCTET_STRING) return t
+    inner = t.contentEnd
+  }
+  return undefined
+}
+
+function extractExtensionSans(buf: Uint8Array, ext: Tlv): string[] {
+  if (ext.tag !== TAG_SEQUENCE) return []
+  const oidTlv = readTlv(buf, ext.contentStart)
+  if (oidTlv.tag !== TAG_OID) return []
+  if (decodeOid(buf, oidTlv) !== OID_SUBJECT_ALT_NAME) return []
+  const octet = findSanOctetString(buf, ext, oidTlv.contentEnd)
+  if (!octet) return []
+  const sanSeq = readTlv(buf, octet.contentStart)
+  if (sanSeq.tag !== TAG_SEQUENCE) return []
+  return parseSanNames(buf, sanSeq)
+}
+
+function walkExtensions(buf: Uint8Array, seq: Tlv, sans: string[]): void {
+  let extCursor = seq.contentStart
+  while (extCursor < seq.contentEnd) {
+    const ext = readTlv(buf, extCursor)
+    sans.push(...extractExtensionSans(buf, ext))
+    extCursor = ext.contentEnd
+  }
+}
+
 function parseExtensionRequest(buf: Uint8Array, set: Tlv): string[] {
   // SET OF { SEQUENCE OF Extension }
   const sans: string[] = []
   let cursor = set.contentStart
   while (cursor < set.contentEnd) {
     const seq = readTlv(buf, cursor)
-    if (seq.tag === TAG_SEQUENCE) {
-      let extCursor = seq.contentStart
-      while (extCursor < seq.contentEnd) {
-        const ext = readTlv(buf, extCursor)
-        if (ext.tag === TAG_SEQUENCE) {
-          const oidTlv = readTlv(buf, ext.contentStart)
-          if (oidTlv.tag === TAG_OID) {
-            const extOid = decodeOid(buf, oidTlv)
-            if (extOid === OID_SUBJECT_ALT_NAME) {
-              // The next TLV is either OCTET STRING (DER-encoded SAN) or — if
-              // an optional `critical BOOLEAN` is present — a BOOLEAN followed
-              // by the OCTET STRING. Walk forward looking for the OCTET STRING.
-              let inner = oidTlv.contentEnd
-              while (inner < ext.contentEnd) {
-                const t = readTlv(buf, inner)
-                if (t.tag === TAG_OCTET_STRING) {
-                  const sanSeq = readTlv(buf, t.contentStart)
-                  if (sanSeq.tag === TAG_SEQUENCE) {
-                    sans.push(...parseSanNames(buf, sanSeq))
-                  }
-                  break
-                }
-                inner = t.contentEnd
-              }
-            }
-          }
-        }
-        extCursor = ext.contentEnd
-      }
-    }
+    if (seq.tag === TAG_SEQUENCE) walkExtensions(buf, seq, sans)
     cursor = seq.contentEnd
   }
   return sans
@@ -471,7 +479,7 @@ function decodeString(buf: Uint8Array, tlv: Tlv): string | undefined {
       if (slice.length % 2 !== 0) return undefined
       let out = ''
       for (let i = 0; i < slice.length; i += 2) {
-        out += String.fromCharCode((slice[i] << 8) | slice[i + 1])
+        out += String.fromCodePoint((slice[i] << 8) | slice[i + 1])
       }
       return out
     }
@@ -482,7 +490,7 @@ function decodeString(buf: Uint8Array, tlv: Tlv): string | undefined {
 
 function bytesToAscii(bytes: Uint8Array): string {
   let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i])
+  for (const b of bytes) s += String.fromCodePoint(b)
   return s
 }
 

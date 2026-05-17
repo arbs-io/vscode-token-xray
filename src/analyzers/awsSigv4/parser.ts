@@ -52,7 +52,7 @@ export function parseSigv4Authorization(header: string): Sigv4Components | undef
 
   const credentialMatch = /Credential\s*=\s*([^,\s]+)/i.exec(trimmed)
   const signedHeadersMatch = /SignedHeaders\s*=\s*([^,\s]+)/i.exec(trimmed)
-  const signatureMatch = /Signature\s*=\s*([A-Fa-f0-9]+)/i.exec(trimmed)
+  const signatureMatch = /Signature\s*=\s*([A-F0-9]+)/i.exec(trimmed)
   if (!credentialMatch || !signedHeadersMatch || !signatureMatch) return undefined
 
   const credentialParts = credentialMatch[1].split('/')

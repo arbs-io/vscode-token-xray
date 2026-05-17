@@ -26,18 +26,21 @@ const SIGNATURE_BLOCK = (alg: string, dig: string) => `
       <ds:SignatureValue>xxx</ds:SignatureValue>
     </ds:Signature>`
 
+function renderConditions(options: SamlFixtureOptions): string {
+  if (!options.notBefore && !options.notOnOrAfter && options.audience === null) return ''
+  const notBeforeAttr = options.notBefore ? ` NotBefore="${options.notBefore}"` : ''
+  const notOnOrAfterAttr = options.notOnOrAfter ? ` NotOnOrAfter="${options.notOnOrAfter}"` : ''
+  const audienceBody =
+    options.audience === null
+      ? ''
+      : `<saml:AudienceRestriction><saml:Audience>${options.audience ?? 'https://sp.example.test/'}</saml:Audience></saml:AudienceRestriction>`
+  return `<saml:Conditions${notBeforeAttr}${notOnOrAfterAttr}>${audienceBody}</saml:Conditions>`
+}
+
 export function samlResponseFixture(options: SamlFixtureOptions = {}): string {
   const issuer = options.issuer === null ? '' : `<saml:Issuer>${options.issuer ?? 'https://idp.example.test/'}</saml:Issuer>`
   const conditions =
-    options.notBefore || options.notOnOrAfter || options.audience !== null
-      ? `<saml:Conditions${options.notBefore ? ` NotBefore="${options.notBefore}"` : ''}${
-          options.notOnOrAfter ? ` NotOnOrAfter="${options.notOnOrAfter}"` : ''
-        }>${
-          options.audience === null
-            ? ''
-            : `<saml:AudienceRestriction><saml:Audience>${options.audience ?? 'https://sp.example.test/'}</saml:Audience></saml:AudienceRestriction>`
-        }</saml:Conditions>`
-      : ''
+    options.notBefore || options.notOnOrAfter || options.audience !== null ? renderConditions(options) : ''
   const signature = options.signed
     ? SIGNATURE_BLOCK(
         options.signatureAlg ?? 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
@@ -71,7 +74,7 @@ export function toRedirectEncoded(text: string): string {
   // HTTP-Redirect binding: DEFLATE then base64 then URL-encode.
   // Using zlib.deflateRawSync to produce raw deflate (no zlib header).
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { deflateRawSync } = require('zlib') as typeof import('zlib')
+  const { deflateRawSync } = require('node:zlib')
   const deflated = deflateRawSync(Buffer.from(text, 'utf8'))
   return encodeURIComponent(deflated.toString('base64'))
 }

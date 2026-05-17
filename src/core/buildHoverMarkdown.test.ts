@@ -22,7 +22,7 @@ describe('buildHoverMarkdown', () => {
 
     it('falls back to "detection" when kind is undefined', () => {
       const md = buildHoverMarkdown(
-        makeResult({ analyzerId: 'jwt', kind: undefined as unknown as string })
+        makeResult({ analyzerId: 'jwt', kind: undefined as unknown })
       )
       expect(md).toContain('**JWT** — detection')
     })
@@ -519,7 +519,7 @@ describe('buildHoverMarkdown', () => {
           ],
         })
       )
-      expect(md).toContain('| k | a\\|b<br>c |')
+      expect(md).toContain(String.raw`| k | a\|b<br>c |`)
     })
 
     it('renders null / undefined values as _(none)_', () => {

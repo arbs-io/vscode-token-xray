@@ -65,50 +65,34 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
  * provided result + range; this lets the unit tests assert behaviour
  * with a hand-crafted `AnalysisResult` and no fixtures.
  */
+type Position = { line: number; column: number }
+type HintBuilder = (result: AnalysisResult, position: Position, now: number) => InlayHintDto[]
+
+const HINT_BUILDERS: Record<string, HintBuilder> = {
+  jwt: (result, position, now) => collect(buildExpHint(result, position, now)),
+  paseto: (result, position, now) => collect(buildExpHint(result, position, now)),
+  x509: (result, position) =>
+    collect(buildX509ValidityHint(result, position), buildX509KeyHint(result, position)),
+  samlMetadata: (result, position) =>
+    collect(buildSamlMetadataValidityHint(result, position), buildSamlMetadataKeyHint(result, position)),
+  oauth: (result, position) => collect(buildOauthLiveHint(result, position)),
+  secret: (result, position) => collect(buildSecretHint(result, position)),
+}
+
+function collect(...hints: Array<InlayHintDto | undefined>): InlayHintDto[] {
+  return hints.filter((h): h is InlayHintDto => Boolean(h))
+}
+
 export function findingsToInlayDtos(
   result: AnalysisResult,
   hitRange: HitRange,
   options: InlayHintOptions = {}
 ): InlayHintDto[] {
   if (!result || !hitRange) return []
-  const position = { line: hitRange.endLine, column: hitRange.endColumn }
-  const now = options.now ?? Date.now()
-  const out: InlayHintDto[] = []
-
-  switch (result.analyzerId) {
-    case 'jwt':
-    case 'paseto': {
-      const expHint = buildExpHint(result, position, now)
-      if (expHint) out.push(expHint)
-      return out
-    }
-    case 'x509': {
-      const validityHint = buildX509ValidityHint(result, position)
-      if (validityHint) out.push(validityHint)
-      const keyHint = buildX509KeyHint(result, position)
-      if (keyHint) out.push(keyHint)
-      return out
-    }
-    case 'samlMetadata': {
-      const validityHint = buildSamlMetadataValidityHint(result, position)
-      if (validityHint) out.push(validityHint)
-      const keyHint = buildSamlMetadataKeyHint(result, position)
-      if (keyHint) out.push(keyHint)
-      return out
-    }
-    case 'oauth': {
-      const liveHint = buildOauthLiveHint(result, position)
-      if (liveHint) out.push(liveHint)
-      return out
-    }
-    case 'secret': {
-      const secretHint = buildSecretHint(result, position)
-      if (secretHint) out.push(secretHint)
-      return out
-    }
-    default:
-      return out
-  }
+  const builder = HINT_BUILDERS[result.analyzerId]
+  if (!builder) return []
+  const position: Position = { line: hitRange.endLine, column: hitRange.endColumn }
+  return builder(result, position, options.now ?? Date.now())
 }
 
 function buildExpHint(
@@ -257,25 +241,28 @@ function findRowByKey(section: Section, key: string): SectionRow | undefined {
  * PASETO analyzer passes the raw claim through, which can be a string
  * ISO timestamp or a number. We accept all three.
  */
+function secondsOrMillis(value: number): number {
+  // Heuristic: small numbers are seconds, large numbers are milliseconds.
+  // Anything below year 5000 in seconds (≈ 95 billion) is treated as seconds.
+  return value < 1e12 ? value * 1000 : value
+}
+
+function parseTimestampString(value: string): number | undefined {
+  const isoMatch = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/.exec(value)
+  if (isoMatch) {
+    const ms = Date.parse(isoMatch[0])
+    if (Number.isFinite(ms)) return ms
+  }
+  const parsed = Date.parse(value)
+  if (Number.isFinite(parsed)) return parsed
+  const asNumber = Number(value)
+  if (Number.isFinite(asNumber) && asNumber > 0) return secondsOrMillis(asNumber)
+  return undefined
+}
+
 function parseTimestampValue(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    // Heuristic: small numbers are seconds, large numbers are milliseconds.
-    // Anything below year 5000 in seconds (≈ 95 billion) is treated as seconds.
-    return value < 1e12 ? value * 1000 : value
-  }
-  if (typeof value === 'string') {
-    const isoMatch = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/.exec(value)
-    if (isoMatch) {
-      const ms = Date.parse(isoMatch[0])
-      if (Number.isFinite(ms)) return ms
-    }
-    const parsed = Date.parse(value)
-    if (Number.isFinite(parsed)) return parsed
-    const asNumber = Number(value)
-    if (Number.isFinite(asNumber) && asNumber > 0) {
-      return asNumber < 1e12 ? asNumber * 1000 : asNumber
-    }
-  }
+  if (typeof value === 'number' && Number.isFinite(value)) return secondsOrMillis(value)
+  if (typeof value === 'string') return parseTimestampString(value)
   return undefined
 }
 

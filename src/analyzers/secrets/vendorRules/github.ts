@@ -41,11 +41,11 @@ const APP_PRIVATE_KEY_PATH: SecretRule = {
   id: 'secret.github.appPrivateKeyPath',
   vendor: 'github',
   name: 'GitHub App private key file path (labelled)',
-  pattern: /(?:GITHUB_APP_PRIVATE_KEY_PATH|GH_APP_PRIVATE_KEY_PATH|github_app_private_key_path|githubAppPrivateKeyPath)["']?\s*[:=]\s*["']?(?:[A-Za-z]:)?[\/\\][^\s"']{1,256}\.pem["']?/g,
+  pattern: /(?:GITHUB_APP_PRIVATE_KEY_PATH|GH_APP_PRIVATE_KEY_PATH|github_app_private_key_path|githubAppPrivateKeyPath)["']?\s*[:=]\s*["']?(?:[A-Za-z]:)?[/\\][^\s"']{1,256}\.pem["']?/g,
   severity: 'info',
   description:
     'Path to a GitHub App private key .pem file. The file itself should be excluded from source control; surfacing the path here flags the location to review.',
-  sensitiveSpan: (raw) => sensitiveAfterDelimiter(raw, /[:=]\s*["']?((?:[A-Za-z]:)?[\/\\][^\s"']{1,256}\.pem)/),
+  sensitiveSpan: (raw) => sensitiveAfterDelimiter(raw, /[:=]\s*["']?((?:[A-Za-z]:)?[/\\][^\s"']{1,256}\.pem)/),
 }
 
 export const GITHUB_SECRET_RULES: SecretRule[] = [

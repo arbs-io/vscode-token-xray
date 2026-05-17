@@ -32,7 +32,7 @@ const SEVERITY_STYLE: Record<Severity, { bg: string; fg: string; label: string }
   info: { bg: "#1d3a5a", fg: "#a8d4ff", label: "INFO" },
 };
 
-function FindingsBanner({ findings }: { findings: Finding[] }) {
+function FindingsBanner({ findings }: Readonly<{ findings: Finding[] }>) {
   if (findings.length === 0) return null;
   return (
     <section

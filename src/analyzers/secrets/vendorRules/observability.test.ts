@@ -326,7 +326,7 @@ describe('OBSERVABILITY_SECRET_RULES — coverage', () => {
   })
 
   it('exposes the expected rule ids', () => {
-    const ids = OBSERVABILITY_SECRET_RULES.map((r) => r.id).sort()
+    const ids = OBSERVABILITY_SECRET_RULES.map((r) => r.id).sort((a, b) => a.localeCompare(b))
     expect(ids).toEqual([
       'secret.datadog.apiKeyLabelled',
       'secret.datadog.appKeyLabelled',

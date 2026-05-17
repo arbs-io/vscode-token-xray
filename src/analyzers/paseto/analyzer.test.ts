@@ -7,8 +7,8 @@ function b64u(bytes: Uint8Array): string {
   return Buffer.from(bytes)
     .toString('base64')
     .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
 }
 
 function fakePublic(version: 'v1' | 'v2' | 'v3' | 'v4', claims: object): string {
@@ -102,7 +102,7 @@ describe('PasetoAnalyzer.analyze', () => {
   })
 
   it('exposes the footer when present', () => {
-    const footer = Buffer.from('{"kid":"k1"}').toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+    const footer = Buffer.from('{"kid":"k1"}').toString('base64').replace(/=+$/, '').replaceAll('+', '-').replaceAll('/', '_')
     const token = `${fakePublic('v4', { sub: 'x' })}.${footer}`
     const result = analyzer.analyze({ text: token })
     const headerRows = result.sections[0].rows
@@ -110,7 +110,7 @@ describe('PasetoAnalyzer.analyze', () => {
   })
 
   it('renders an "invalid payload" section when public payload cannot be decoded', () => {
-    const tiny = Buffer.from(new Uint8Array([1, 2, 3, 4])).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+    const tiny = Buffer.from(new Uint8Array([1, 2, 3, 4])).toString('base64').replace(/=+$/, '').replaceAll('+', '-').replaceAll('/', '_')
     const result = analyzer.analyze({ text: `v4.public.${tiny}` })
     const payload = result.sections.find((s) => s.id === 'payload')
     expect(payload?.rows[0].value).toBe('invalid')

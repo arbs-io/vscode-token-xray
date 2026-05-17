@@ -17,7 +17,7 @@ export function base64UrlDecode(input: string): string {
   try {
     return decodeURIComponent(
       binary.replace(/(.)/g, (_m, p: string) => {
-        const code = p.charCodeAt(0).toString(16).toUpperCase()
+        const code = (p.codePointAt(0) ?? 0).toString(16).toUpperCase()
         return '%' + (code.length < 2 ? '0' + code : code)
       })
     )
@@ -43,7 +43,7 @@ export function base64UrlDecodeBytes(input: string): Uint8Array {
   const binary = atob(output)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
+    bytes[i] = binary.codePointAt(i) ?? 0
   }
   return bytes
 }

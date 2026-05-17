@@ -65,8 +65,8 @@ describe('matchesGlob', () => {
   })
 
   it('normalises Windows path separators', () => {
-    expect(matchesGlob('a\\b\\c.ts', '**/*.ts')).toBe(true)
-    expect(matchesGlob('a\\b\\c.ts', 'a/b/*.ts')).toBe(true)
+    expect(matchesGlob(String.raw`a\b\c.ts`, '**/*.ts')).toBe(true)
+    expect(matchesGlob(String.raw`a\b\c.ts`, 'a/b/*.ts')).toBe(true)
   })
 
   it('strips a leading ./ from input', () => {

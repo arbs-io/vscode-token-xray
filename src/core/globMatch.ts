@@ -46,7 +46,12 @@ function normalisePath(path: string): string {
   return out
 }
 
-function compileGlob(pattern: string, options: GlobMatchOptions): RegExp {
+interface PreparedGlob {
+  body: string
+  anchored: boolean
+}
+
+function prepareGlob(pattern: string): PreparedGlob {
   let p = pattern.replace(/\\/g, '/')
 
   // Trailing slash means "match this directory and everything under it".
@@ -66,38 +71,42 @@ function compileGlob(pattern: string, options: GlobMatchOptions): RegExp {
   }
 
   if (trailingDir) p = p + '/**'
+  return { body: p, anchored }
+}
+
+function readStarRun(p: string, i: number): { fragment: string; consumed: number } {
+  if (p[i + 1] === '*') {
+    // `**/` consumes the slash too so it can match zero segments.
+    if (p[i + 2] === '/') return { fragment: '(?:.*/)?', consumed: 3 }
+    return { fragment: '.*', consumed: 2 }
+  }
+  return { fragment: '[^/]*', consumed: 1 }
+}
+
+function readBracket(p: string, i: number): { fragment: string; consumed: number } {
+  const close = p.indexOf(']', i + 1)
+  if (close === -1) return { fragment: String.raw`\[`, consumed: 1 }
+  return { fragment: '[' + p.slice(i + 1, close) + ']', consumed: close + 1 - i }
+}
+
+function compileGlob(pattern: string, options: GlobMatchOptions): RegExp {
+  const { body: p, anchored } = prepareGlob(pattern)
 
   let re = ''
   let i = 0
   while (i < p.length) {
     const c = p[i]
     if (c === '*') {
-      if (p[i + 1] === '*') {
-        // `**` — zero or more path segments.
-        // `**/` consumes the slash too so it can match zero segments.
-        if (p[i + 2] === '/') {
-          re += '(?:.*/)?'
-          i += 3
-        } else {
-          re += '.*'
-          i += 2
-        }
-      } else {
-        re += '[^/]*'
-        i += 1
-      }
+      const { fragment, consumed } = readStarRun(p, i)
+      re += fragment
+      i += consumed
     } else if (c === '?') {
       re += '[^/]'
       i += 1
     } else if (c === '[') {
-      const close = p.indexOf(']', i + 1)
-      if (close === -1) {
-        re += '\\['
-        i += 1
-      } else {
-        re += '[' + p.slice(i + 1, close) + ']'
-        i = close + 1
-      }
+      const { fragment, consumed } = readBracket(p, i)
+      re += fragment
+      i += consumed
     } else if (/[.+^$(){}|]/.test(c)) {
       re += '\\' + c
       i += 1
@@ -108,9 +117,7 @@ function compileGlob(pattern: string, options: GlobMatchOptions): RegExp {
   }
 
   const flags = options.nocase ? 'i' : ''
-  if (anchored) {
-    return new RegExp('^' + re + '$', flags)
-  }
+  if (anchored) return new RegExp('^' + re + '$', flags)
   // Unanchored patterns match anywhere in the path: equivalent to `**/pattern`.
   return new RegExp('(?:^|/)' + re + '$', flags)
 }

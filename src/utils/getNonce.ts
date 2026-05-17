@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { randomBytes } from 'node:crypto'
 
 /**
  * A helper function that returns a unique alphanumeric identifier called a nonce.

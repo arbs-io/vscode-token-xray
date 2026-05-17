@@ -126,7 +126,7 @@ function tryDecodeFooter(footer: string): string | undefined {
     const bytes = base64UrlDecodeBytes(footer)
     const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
     // Only return printable / JSON-looking footers — otherwise leave undefined.
-    if (/^[\x09\x0a\x0d\x20-\x7e]*$/.test(text)) return text
+    if (/^[\t\n\r\x20-\x7e]*$/.test(text)) return text
     return undefined
   } catch {
     return undefined

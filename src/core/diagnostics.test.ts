@@ -7,8 +7,8 @@ function b64u(json: object): string {
   return Buffer.from(JSON.stringify(json))
     .toString('base64')
     .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
 }
 
 describe('findingToDiagnostic', () => {
@@ -201,7 +201,7 @@ describe('diagnosticsAcrossRegistry', () => {
       })
     }
     const out = await diagnosticsAcrossRegistry('plain text body', reg2)
-    const sources = out.filter((d) => d.code === 'demo.shared').map((d) => d.source).sort()
+    const sources = out.filter((d) => d.code === 'demo.shared').map((d) => d.source).sort((a, b) => a.localeCompare(b))
     expect(sources).toEqual(['twinA', 'twinB'])
   })
 })

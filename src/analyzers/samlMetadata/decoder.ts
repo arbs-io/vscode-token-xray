@@ -1,4 +1,4 @@
-import { X509Certificate } from 'crypto'
+import { X509Certificate } from 'node:crypto'
 import { XMLParser } from 'fast-xml-parser'
 
 /**
@@ -61,6 +61,23 @@ const parser = new XMLParser({
  * input is not metadata (wrong root element, malformed XML, missing
  * entityID on a single EntityDescriptor, …). Never throws.
  */
+function decodeFromEntitiesDescriptor(parsed: Record<string, unknown>): DecodedSamlMetadata | undefined {
+  const root = parsed.EntitiesDescriptor as Record<string, unknown> | undefined
+  if (!root) return undefined
+  const eds = root.EntityDescriptor
+  let list: unknown[]
+  if (Array.isArray(eds)) list = eds
+  else if (eds === undefined) list = []
+  else list = [eds]
+  const entities: SamlMetadataEntity[] = []
+  for (const e of list) {
+    const parsedEntity = parseEntity(e)
+    if (parsedEntity) entities.push(parsedEntity)
+  }
+  if (entities.length === 0) return undefined
+  return { entities, rootKind: 'EntitiesDescriptor' }
+}
+
 export function decodeSamlMetadata(xml: string): DecodedSamlMetadata | undefined {
   if (typeof xml !== 'string') return undefined
   const trimmed = xml.trim()
@@ -75,22 +92,11 @@ export function decodeSamlMetadata(xml: string): DecodedSamlMetadata | undefined
 
   if ('EntityDescriptor' in parsed) {
     const entity = parseEntity(parsed.EntityDescriptor)
-    if (!entity) return undefined
-    return { entities: [entity], rootKind: 'EntityDescriptor' }
+    return entity ? { entities: [entity], rootKind: 'EntityDescriptor' } : undefined
   }
 
   if ('EntitiesDescriptor' in parsed) {
-    const root = parsed.EntitiesDescriptor as Record<string, unknown> | undefined
-    if (!root) return undefined
-    const eds = root.EntityDescriptor
-    const list = Array.isArray(eds) ? eds : eds === undefined ? [] : [eds]
-    const entities: SamlMetadataEntity[] = []
-    for (const e of list) {
-      const parsedEntity = parseEntity(e)
-      if (parsedEntity) entities.push(parsedEntity)
-    }
-    if (entities.length === 0) return undefined
-    return { entities, rootKind: 'EntitiesDescriptor' }
+    return decodeFromEntitiesDescriptor(parsed)
   }
 
   return undefined
@@ -222,7 +228,7 @@ function collectStrings(raw: unknown): string[] {
 function asString(value: unknown): string | undefined {
   if (typeof value === 'string') return value
   if (value && typeof value === 'object' && '#text' in value) {
-    return String((value as { '#text': unknown })['#text'])
+    return String(value['#text'])
   }
   return undefined
 }

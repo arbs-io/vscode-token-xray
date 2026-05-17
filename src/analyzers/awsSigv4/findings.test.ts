@@ -54,7 +54,7 @@ describe('findingsForSigv4', () => {
       accessKeyId: 'ASIAIOSFODNN7EXAMPLE',
       signedHeaders: ['x-amz-date'],
     })
-    const ids = findings.map((f) => f.id).sort()
+    const ids = findings.map((f) => f.id).sort((a, b) => a.localeCompare(b))
     expect(ids).toEqual([
       'awsSigv4.accessKeyExposed',
       'awsSigv4.session.token',

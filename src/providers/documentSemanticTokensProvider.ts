@@ -30,7 +30,7 @@ export function registerDocumentSemanticTokensProvider(context: ExtensionContext
 }
 
 export class JwtDocumentSemanticTokensProvider implements DocumentSemanticTokensProvider {
-  readonly legend = new SemanticTokensLegend(ALL_JWT_SEMANTIC_TOKEN_TYPES as unknown as string[])
+  readonly legend = new SemanticTokensLegend(ALL_JWT_SEMANTIC_TOKEN_TYPES)
 
   constructor(private readonly _context: ExtensionContext) {}
 

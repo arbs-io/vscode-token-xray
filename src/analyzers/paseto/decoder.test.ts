@@ -8,8 +8,8 @@ function b64u(bytes: Uint8Array): string {
   return Buffer.from(bytes)
     .toString('base64')
     .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
 }
 
 function b64uStr(s: string): string {

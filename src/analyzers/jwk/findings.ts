@@ -35,18 +35,48 @@ export function evaluateJwk(input: DecodedJwkInput): Finding[] {
   return out
 }
 
+function evaluateRsaKey(key: DecodedJwk, tag: (id: string) => string): Finding[] {
+  if (key.kty !== 'RSA') return []
+  if (key.keySizeBits === undefined) {
+    return [{ id: tag('rsa.modulus.missing'), severity: 'error', message: 'RSA key missing modulus "n".' }]
+  }
+  if (key.keySizeBits < 2048) {
+    return [{
+      id: tag('rsa.key.weak'),
+      severity: 'error',
+      message: `RSA key is ${key.keySizeBits} bits — below the 2048-bit minimum.`,
+    }]
+  }
+  return []
+}
+
+function evaluateCurve(key: DecodedJwk, tag: (id: string) => string): Finding[] {
+  if ((key.kty !== 'EC' && key.kty !== 'OKP') || !key.curve) return []
+  if (!KNOWN_CURVES.has(key.curve)) {
+    return [{ id: tag('curve.unknown'), severity: 'warning', message: `Unknown curve "${key.curve}".` }]
+  }
+  if (WEAK_CURVES.has(key.curve)) {
+    return [{
+      id: tag('curve.weak'),
+      severity: 'warning',
+      message: `Curve "${key.curve}" is deprecated or weak. Prefer P-256 / P-384 / Ed25519.`,
+    }]
+  }
+  return []
+}
+
 function evaluateSingle(key: DecodedJwk, prefix: string): Finding[] {
-  const out: Finding[] = []
   const tag = (id: string) => `jwk.${prefix}${id}`
 
   if (!['RSA', 'EC', 'OKP', 'oct'].includes(key.kty)) {
-    out.push({
+    return [{
       id: tag('kty.unknown'),
       severity: 'warning',
       message: `Unknown key type "${key.kty}". Expected RSA, EC, OKP, or oct.`,
-    })
-    return out
+    }]
   }
+
+  const out: Finding[] = []
 
   if (!key.kid) {
     out.push({
@@ -64,17 +94,7 @@ function evaluateSingle(key: DecodedJwk, prefix: string): Finding[] {
     })
   }
 
-  if (key.kty === 'RSA') {
-    if (key.keySizeBits === undefined) {
-      out.push({ id: tag('rsa.modulus.missing'), severity: 'error', message: 'RSA key missing modulus "n".' })
-    } else if (key.keySizeBits < 2048) {
-      out.push({
-        id: tag('rsa.key.weak'),
-        severity: 'error',
-        message: `RSA key is ${key.keySizeBits} bits — below the 2048-bit minimum.`,
-      })
-    }
-  }
+  out.push(...evaluateRsaKey(key, tag))
 
   if (key.kty === 'oct' && key.keySizeBits !== undefined && key.keySizeBits < 128) {
     out.push({
@@ -84,21 +104,7 @@ function evaluateSingle(key: DecodedJwk, prefix: string): Finding[] {
     })
   }
 
-  if ((key.kty === 'EC' || key.kty === 'OKP') && key.curve) {
-    if (!KNOWN_CURVES.has(key.curve)) {
-      out.push({
-        id: tag('curve.unknown'),
-        severity: 'warning',
-        message: `Unknown curve "${key.curve}".`,
-      })
-    } else if (WEAK_CURVES.has(key.curve)) {
-      out.push({
-        id: tag('curve.weak'),
-        severity: 'warning',
-        message: `Curve "${key.curve}" is deprecated or weak. Prefer P-256 / P-384 / Ed25519.`,
-      })
-    }
-  }
+  out.push(...evaluateCurve(key, tag))
 
   if (key.use && !['sig', 'enc'].includes(key.use)) {
     out.push({

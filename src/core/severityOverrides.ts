@@ -50,6 +50,40 @@ const VALID: ReadonlySet<SeverityOverride> = new Set<SeverityOverride>([
  * The function is pure: no vscode imports, no I/O, never throws, never
  * mutates its inputs.
  */
+interface SplitOverrides {
+  exact: Map<string, SeverityOverride>
+  wildcards: Array<{ prefix: string; value: SeverityOverride }>
+}
+
+function splitOverrides(overrides: SeverityOverrideMap): SplitOverrides {
+  // Pre-split overrides into exact and wildcard buckets so we can pick
+  // the most specific match per finding in O(wildcards) instead of
+  // re-scanning the whole map.
+  const exact = new Map<string, SeverityOverride>()
+  const wildcards: Array<{ prefix: string; value: SeverityOverride }> = []
+  for (const key of Object.keys(overrides)) {
+    const value = overrides[key]
+    if (!isValidOverride(value)) continue
+    if (key.endsWith('.*')) {
+      const prefix = key.slice(0, -2)
+      if (prefix) wildcards.push({ prefix, value })
+    } else if (key) {
+      exact.set(key, value)
+    }
+  }
+  // Longest prefix first so the first hit during iteration wins.
+  wildcards.sort((a, b) => b.prefix.length - a.prefix.length)
+  return { exact, wildcards }
+}
+
+function applyOverride(finding: Finding, override: SeverityOverride | undefined): Finding | undefined {
+  if (override === undefined) return finding
+  if (override === 'off') return undefined
+  // Same severity — preserve reference identity so the no-op path is observably cheap.
+  if (override === finding.severity) return finding
+  return { ...finding, severity: override }
+}
+
 export function applySeverityOverrides(
   findings: Finding[],
   overrides: SeverityOverrideMap
@@ -57,43 +91,12 @@ export function applySeverityOverrides(
   if (!findings || findings.length === 0) return findings ?? []
   if (!overrides || typeof overrides !== 'object') return findings.slice()
 
-  // Pre-split overrides into exact and wildcard buckets so we can pick
-  // the most specific match per finding in O(wildcards) instead of
-  // re-scanning the whole map.
-  const exact = new Map<string, SeverityOverride>()
-  const wildcards: Array<{ prefix: string; value: SeverityOverride }> = []
-
-  for (const key of Object.keys(overrides)) {
-    const value = overrides[key]
-    if (!isValidOverride(value)) continue
-    if (key.endsWith('.*')) {
-      const prefix = key.slice(0, -2)
-      if (!prefix) continue // bare `.*` is a no-op
-      wildcards.push({ prefix, value })
-      continue
-    }
-    if (!key) continue
-    exact.set(key, value)
-  }
-
-  // Longest prefix first so the first hit during iteration wins.
-  wildcards.sort((a, b) => b.prefix.length - a.prefix.length)
+  const { exact, wildcards } = splitOverrides(overrides)
 
   const out: Finding[] = []
   for (const finding of findings) {
-    const override = resolveOverride(finding.id, exact, wildcards)
-    if (override === undefined) {
-      out.push(finding)
-      continue
-    }
-    if (override === 'off') continue
-    if (override === finding.severity) {
-      // Same severity — preserve reference identity to make the no-op
-      // path observably cheap (the caller can `===`-check the array).
-      out.push(finding)
-      continue
-    }
-    out.push({ ...finding, severity: override as Severity })
+    const result = applyOverride(finding, resolveOverride(finding.id, exact, wildcards))
+    if (result) out.push(result)
   }
   return out
 }

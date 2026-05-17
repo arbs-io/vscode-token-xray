@@ -149,7 +149,7 @@ function deriveEnvKey(text: string, secretStart: number, ruleId: string): string
   // matches the patterns the secret rules already key off of.
   const lookBack = text.slice(Math.max(0, secretStart - 256), secretStart)
   // Match the rightmost label.
-  const labelMatch = lookBack.match(/(?:["'])?([A-Z][A-Z0-9_]{1,63})(?:["'])?\s*[:=]\s*["']?$/)
+  const labelMatch = /(?:["'])?([A-Z][A-Z0-9_]{1,63})(?:["'])?\s*[:=]\s*["']?$/.exec(lookBack)
   if (labelMatch) return labelMatch[1]
   return ruleIdToEnvKey(ruleId)
 }
@@ -174,7 +174,7 @@ function offsetFor(line: number, column: number, lineStarts: number[], textLen: 
 function computeLineStarts(text: string): number[] {
   const starts = [0]
   for (let i = 0; i < text.length; i++) {
-    if (text.charCodeAt(i) === 10) starts.push(i + 1)
+    if (text.codePointAt(i) === 10) starts.push(i + 1)
   }
   return starts
 }

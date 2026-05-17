@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { tryWrapDerAsPem } from './derWrap'
 import { decodeX509 } from './decoder'
@@ -60,7 +60,7 @@ describe('tryWrapDerAsPem', () => {
 
   it('returns undefined when base64 length is not a multiple of 4', () => {
     // Drop the last padding char so the length is no longer mod-4.
-    const odd = goodDerBase64.slice(0, goodDerBase64.length - 1)
+    const odd = goodDerBase64.slice(0, -1)
     expect(tryWrapDerAsPem(odd, 'cert.cer')).toBeUndefined()
   })
 
@@ -72,7 +72,7 @@ describe('tryWrapDerAsPem', () => {
 
   it('returns undefined when decoded length does not match the declared SEQUENCE length', () => {
     // Truncate the real DER blob by ~50 bytes and re-encode → length mismatch.
-    const truncated = goodDerBytes.subarray(0, goodDerBytes.length - 50).toString('base64')
+    const truncated = goodDerBytes.subarray(0, -50).toString('base64')
     expect(tryWrapDerAsPem(truncated, 'cert.cer')).toBeUndefined()
   })
 

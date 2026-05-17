@@ -25,7 +25,7 @@ function lenPrefixed(bytes: Uint8Array): Uint8Array {
 
 function ascii(s: string): Uint8Array {
   const out = new Uint8Array(s.length)
-  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i)
+  for (let i = 0; i < s.length; i++) out[i] = s.codePointAt(i) ?? 0
   return out
 }
 
@@ -43,7 +43,7 @@ function concat(...parts: Uint8Array[]): Uint8Array {
 
 function bytesToBase64(bytes: Uint8Array): string {
   let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i])
+  for (const b of bytes) s += String.fromCodePoint(b)
   return btoa(s)
 }
 
@@ -75,8 +75,14 @@ function ed25519Line(comment?: string): string {
   return comment ? `ssh-ed25519 ${bytesToBase64(body)} ${comment}` : `ssh-ed25519 ${bytesToBase64(body)}`
 }
 
+const ECDSA_POINT_LEN: Record<'nistp256' | 'nistp384' | 'nistp521', number> = {
+  nistp256: 65,
+  nistp384: 97,
+  nistp521: 133,
+}
+
 function ecdsaLine(curve: 'nistp256' | 'nistp384' | 'nistp521'): string {
-  const pointLen = curve === 'nistp256' ? 65 : curve === 'nistp384' ? 97 : 133
+  const pointLen = ECDSA_POINT_LEN[curve]
   const point = new Uint8Array(pointLen)
   point[0] = 0x04
   for (let i = 1; i < pointLen; i++) point[i] = (i * 7) & 0xff

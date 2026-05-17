@@ -29,7 +29,7 @@ export interface DecodedBasic {
  */
 export function decodeBasic(token: string): DecodedBasic | undefined {
   if (typeof token !== 'string') return undefined
-  const trimmed = token.replace(/[\s]+$/u, '')
+  const trimmed = token.replace(/\s+$/u, '')
   if (trimmed.length === 0) return undefined
 
   // Reject anything containing characters outside the base64 alphabet
@@ -51,7 +51,7 @@ export function decodeBasic(token: string): DecodedBasic | undefined {
   try {
     const binary = atob(normalised)
     const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0
     decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   } catch {
     return undefined

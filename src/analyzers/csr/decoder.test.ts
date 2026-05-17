@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { decodeCsr, extractCsrBlocks } from './decoder'
 
@@ -143,13 +143,13 @@ function derFromPem(p: string): Uint8Array {
   const body = m[1].replace(/\s+/g, '')
   const binary = atob(body)
   const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0
   return bytes
 }
 
 function pemFromDer(der: Uint8Array): string {
   let b = ''
-  for (let i = 0; i < der.length; i++) b += String.fromCharCode(der[i])
+  for (const byte of der) b += String.fromCodePoint(byte)
   const base64 = btoa(b)
   const wrapped = base64.replace(/(.{64})/g, '$1\n')
   return `-----BEGIN CERTIFICATE REQUEST-----\n${wrapped}\n-----END CERTIFICATE REQUEST-----`

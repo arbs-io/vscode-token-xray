@@ -55,18 +55,18 @@ describe('AZURE_SECRET_RULES — SAS token', () => {
 })
 
 describe('AZURE_SECRET_RULES — client_secret', () => {
-  const SECRET_40 = 'aA1~bB2.cC3_dD4-eE5fF6gG7hH8iI9jJ0kK1lL2mM'
+  const FIXTURE_40 = 'aA1~bB2.cC3_dD4-eE5fF6gG7hH8iI9jJ0kK1lL2mM'
 
   it('matches AZURE_CLIENT_SECRET=...', () => {
-    const text = `AZURE_CLIENT_SECRET=${SECRET_40}`
+    const text = `AZURE_CLIENT_SECRET=${FIXTURE_40}`
     const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.azure.clientSecret')
     expect(hit?.rule.severity).toBe('error')
-    expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(SECRET_40)
+    expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(FIXTURE_40)
   })
 
   it('matches ARM_CLIENT_SECRET alias', () => {
     expect(
-      scanForSecrets(`ARM_CLIENT_SECRET="${SECRET_40}"`, opts).some(
+      scanForSecrets(`ARM_CLIENT_SECRET="${FIXTURE_40}"`, opts).some(
         (h) => h.rule.id === 'secret.azure.clientSecret'
       )
     ).toBe(true)

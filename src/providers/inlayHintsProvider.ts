@@ -79,63 +79,64 @@ export class SecurityInlayHintsProvider implements InlayHintsProvider {
       // Only emit hints for tokens that overlap the visible range so we
       // do not pay for analysis we cannot render.
       if (hit.endOffset < rangeStartOffset || hit.startOffset > rangeEndOffset) continue
-
-      const analyzer = this.registry.get(hit.analyzerId)
-      if (!analyzer) continue
-
-      const match: Match = {
-        text: hit.text,
-        range: { start: hit.startOffset, end: hit.endOffset },
-      }
-
-      let result: AnalysisResult
-      try {
-        result = await Promise.resolve(analyzer.analyze(match))
-      } catch {
-        continue
-      }
-
+      const result = await this.analyzeHit(hit)
+      if (!result) continue
+      const filteredResult = filterByOverridesAndDisableComments(
+        result,
+        readRuleSeverity(document.uri),
+        text,
+        hit.startLine
+      )
       const hitRange: HitRange = {
         startLine: hit.startLine,
         startColumn: hit.startColumn,
         endLine: hit.endLine,
         endColumn: hit.endColumn,
       }
-
-      // Honour user-configured per-rule severity overrides AND inline
-      // `tokenxray-disable-*` directives so the inlay hint mapper never
-      // sees suppressed (or re-graded) findings. Order mirrors the
-      // registry-boundary sequence in `diagnosticsAcrossRegistry`.
-      const overridden = applySeverityOverrides(
-        result.findings ?? [],
-        readRuleSeverity(document.uri)
-      )
-      const located: FindingWithLocation[] = overridden.map((finding) => ({
-        ...finding,
-        startLine: hit.startLine,
-      }))
-      const kept = applyDisableComments(located, text)
-      const filteredResult: AnalysisResult = {
-        ...result,
-        findings: kept.map(({ startLine: _ignored, ...rest }) => rest),
-      }
-
       for (const dto of findingsToInlayDtos(filteredResult, hitRange)) {
-        const hint = new InlayHint(
-          new Position(dto.position.line, dto.position.column),
-          ` ${dto.label}`,
-          InlayHintKind.Type
-        )
-        if (dto.tooltip) {
-          hint.tooltip = new MarkdownString(dto.tooltip)
-        }
-        hint.paddingLeft = true
-        hints.push(hint)
+        hints.push(makeInlayHint(dto))
       }
     }
 
     return hints
   }
+
+  private async analyzeHit(hit: { analyzerId: string; text: string; startOffset: number; endOffset: number }): Promise<AnalysisResult | undefined> {
+    const analyzer = this.registry.get(hit.analyzerId)
+    if (!analyzer) return undefined
+    const match: Match = { text: hit.text, range: { start: hit.startOffset, end: hit.endOffset } }
+    try {
+      return await Promise.resolve(analyzer.analyze(match))
+    } catch {
+      return undefined
+    }
+  }
+}
+
+function filterByOverridesAndDisableComments(
+  result: AnalysisResult,
+  ruleSeverity: SeverityOverrideMap,
+  text: string,
+  startLine: number
+): AnalysisResult {
+  const overridden = applySeverityOverrides(result.findings ?? [], ruleSeverity)
+  const located: FindingWithLocation[] = overridden.map((finding) => ({ ...finding, startLine }))
+  const kept = applyDisableComments(located, text)
+  return {
+    ...result,
+    findings: kept.map(({ startLine: _ignored, ...rest }) => rest),
+  }
+}
+
+function makeInlayHint(dto: ReturnType<typeof findingsToInlayDtos>[number]): InlayHint {
+  const hint = new InlayHint(
+    new Position(dto.position.line, dto.position.column),
+    ` ${dto.label}`,
+    InlayHintKind.Type
+  )
+  if (dto.tooltip) hint.tooltip = new MarkdownString(dto.tooltip)
+  hint.paddingLeft = true
+  return hint
 }
 
 export function registerInlayHintsProvider(context: ExtensionContext) {

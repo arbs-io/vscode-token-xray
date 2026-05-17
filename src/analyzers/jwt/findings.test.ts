@@ -99,7 +99,7 @@ describe('evaluateJwt', () => {
 
   it('skips claim checks when payload is absent (JWE)', () => {
     const findings = evaluateJwt(
-      { kind: 'JWE', header: { alg: 'RSA-OAEP', enc: 'A256GCM' }, segments: [], raw: '' } as DecodedJwt,
+      { kind: 'JWE', header: { alg: 'RSA-OAEP', enc: 'A256GCM' }, segments: [], raw: '' },
       { now: NOW }
     )
     expect(findings.find((f) => f.id?.startsWith('jwt.exp'))).toBeUndefined()

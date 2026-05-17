@@ -100,7 +100,7 @@ describe('scanForSecrets', () => {
       description: 'right',
     }
     const hits = scanForSecrets('ERR and INFO', { rules: [errorRule, infoRule] })
-    expect(hits.map((h) => h.rule.id).sort()).toEqual(['demo.left', 'demo.right'])
+    expect(hits.map((h) => h.rule.id).sort((a, b) => a.localeCompare(b))).toEqual(['demo.left', 'demo.right'])
   })
 
   it('keeps two info-severity hits on the same range (info does not suppress info)', () => {

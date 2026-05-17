@@ -42,7 +42,7 @@ describe('SecretAnalyzer', () => {
     const [match] = analyzer.detect(PEM)
     const result = analyzer.analyze(match)
     const preview = result.sections[0].rows.find((r) => r.key === 'preview')
-    expect(preview?.value as string).toContain('…')
+    expect(preview?.value).toContain('…')
     expect((preview?.value as string).length).toBeLessThan(PEM.length)
   })
 

@@ -18,15 +18,18 @@ const CLIENT_SECRET: SecretRule = {
   sensitiveSpan: (raw) => sensitiveAfterDelimiter(raw, /[:=]\s*["']?([A-Za-z0-9_-]{32,})/),
 }
 
+const AUTH0_MGMT_LABEL = '(?:AUTH0_(?:API_|MGMT_|MANAGEMENT_)TOKEN|auth0(?:Api|Mgmt|Management)Token)'
+const JWT_SHAPE = String.raw`eyJ[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+`
+
 const MANAGEMENT_API_TOKEN: SecretRule = {
   id: 'secret.auth0.managementApiToken',
   vendor: 'auth0',
   name: 'Auth0 Management API token',
-  pattern: /(?:AUTH0_(?:API_|MGMT_|MANAGEMENT_)TOKEN|auth0(?:Api|Mgmt|Management)Token)["']?\s*[:=]\s*["']?eyJ[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+["']?/g,
+  pattern: new RegExp(String.raw`${AUTH0_MGMT_LABEL}["']?\s*[:=]\s*["']?${JWT_SHAPE}["']?`, 'g'),
   severity: 'error',
   description: 'Auth0 Management API token (JWT). Grants tenant-level admin access scoped to the granted `scope` claim.',
   docUrl: 'https://auth0.com/docs/api/management/v2',
-  sensitiveSpan: (raw) => sensitiveAfterDelimiter(raw, /[:=]\s*["']?(eyJ[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+)/),
+  sensitiveSpan: (raw) => sensitiveAfterDelimiter(raw, new RegExp(String.raw`[:=]\s*["']?(${JWT_SHAPE})`)),
 }
 
 const TENANT_DOMAIN: SecretRule = {

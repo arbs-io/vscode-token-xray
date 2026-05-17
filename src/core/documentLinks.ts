@@ -43,6 +43,18 @@ export interface DocumentLinkDto {
  * Identical `(target, range)` pairs are deduplicated so a finding whose
  * `docUrl` matches another finding's `docUrl` doesn't render twice.
  */
+function collectIssuerLinks(result: AnalysisResult): string[] {
+  const urls: string[] = []
+  for (const section of result.sections ?? []) {
+    for (const row of section.rows ?? []) {
+      if (row.key !== 'iss') continue
+      const value = row.value
+      if (typeof value === 'string' && value.startsWith('https://')) urls.push(value)
+    }
+  }
+  return urls
+}
+
 export function extractDocumentLinks(
   result: AnalysisResult,
   hitRange: HitRange,
@@ -56,7 +68,6 @@ export function extractDocumentLinks(
 
   const out: DocumentLinkDto[] = []
   const seen = new Set<string>()
-
   const push = (target: string) => {
     if (!target) return
     const key = `${target}|${hitRange.startLine}:${hitRange.startColumn}-${hitRange.endLine}:${hitRange.endColumn}`
@@ -66,20 +77,9 @@ export function extractDocumentLinks(
   }
 
   for (const finding of result.findings ?? []) {
-    if (finding.docUrl && typeof finding.docUrl === 'string') {
-      push(finding.docUrl)
-    }
+    if (typeof finding.docUrl === 'string') push(finding.docUrl)
   }
-
-  for (const section of result.sections ?? []) {
-    for (const row of section.rows ?? []) {
-      if (row.key !== 'iss') continue
-      const value = row.value
-      if (typeof value !== 'string') continue
-      if (!value.startsWith('https://')) continue
-      push(value)
-    }
-  }
+  for (const url of collectIssuerLinks(result)) push(url)
 
   return out
 }

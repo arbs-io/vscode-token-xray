@@ -39,7 +39,7 @@ describe('decodeBasic', () => {
   it('accepts URL-safe base64 (`-` / `_`) in addition to the standard alphabet', () => {
     // `?>?>` encodes to `Pz4_Pj4=` in URL-safe form (`/` → `_`).
     const standard = Buffer.from('user:p?>?>').toString('base64')
-    const urlSafe = standard.replace(/\+/g, '-').replace(/\//g, '_')
+    const urlSafe = standard.replaceAll('+', '-').replaceAll('/', '_')
     expect(decodeBasic(urlSafe)).toEqual({ user: 'user', password: 'p?>?>' })
   })
 

@@ -25,7 +25,7 @@ export const TOKEN_PATTERNS: TokenPattern[] = [
     id: 'github.pat.fineGrained',
     vendor: 'GitHub',
     kind: 'Fine-grained Personal Access Token',
-    pattern: /github_pat_[A-Za-z0-9_]{82}/g,
+    pattern: /github_pat_\w{82}/g,
     severity: 'error',
     description: 'GitHub fine-grained PAT — should never be committed to source.',
     docUrl: 'https://docs.github.com/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens',

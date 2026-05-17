@@ -99,6 +99,64 @@ export interface DiagnosticsAcrossRegistryOptions {
   onMetrics?: (metrics: DiagnosticsMetrics) => void
 }
 
+type Pending = { finding: Finding; analyzerId: string; range: DiagnosticRangeDto }
+type TaggedFinding = Finding & { __idx: number }
+
+async function collectPending(
+  text: string,
+  registry: AnalyzerRegistry,
+  lineStarts: number[]
+): Promise<Pending[]> {
+  const pending: Pending[] = []
+  for (const analyzer of registry.list()) {
+    for (const match of analyzer.detect(text)) {
+      try {
+        const result = await Promise.resolve(analyzer.analyze(match))
+        const range = match.range
+          ? rangeForOffsets(match.range.start, match.range.end, lineStarts, text)
+          : rangeForLine(0, text.length)
+        for (const finding of result.findings) {
+          pending.push({ finding, analyzerId: analyzer.id, range })
+        }
+      } catch {
+        // analyzer can't decode this match — skip
+      }
+    }
+  }
+  return pending
+}
+
+function runSeverityOverrides(
+  pending: Pending[],
+  overrides: SeverityOverrideMap,
+  emitSuppression: (event: SuppressionEvent) => void
+): { overridden: Pending[]; dropped: number } {
+  const taggedForOverrides: TaggedFinding[] = pending.map((p, idx) => ({ ...p.finding, __idx: idx }))
+  const afterOverrides = applySeverityOverrides(taggedForOverrides, overrides) as TaggedFinding[]
+
+  const survived = new Set<number>()
+  for (const tagged of afterOverrides) survived.add(tagged.__idx)
+
+  let dropped = 0
+  for (let i = 0; i < pending.length; i++) {
+    if (survived.has(i)) continue
+    dropped++
+    emitSuppression({
+      reason: 'severityOverride',
+      findingId: pending[i].finding.id,
+      analyzerId: pending[i].analyzerId,
+      startLine: pending[i].range.startLine,
+    })
+  }
+
+  const overridden: Pending[] = afterOverrides.map((finding) => {
+    const original = pending[finding.__idx]
+    const { __idx: _ignored, ...cleanFinding } = finding
+    return { finding: cleanFinding, analyzerId: original.analyzerId, range: original.range }
+  })
+  return { overridden, dropped }
+}
+
 export async function diagnosticsAcrossRegistry(
   text: string,
   registry: AnalyzerRegistry,
@@ -119,85 +177,23 @@ export async function diagnosticsAcrossRegistry(
     return []
   }
   const lineStarts = computeLineStarts(text)
-  type Pending = { finding: Finding; analyzerId: string; range: DiagnosticRangeDto }
-  const pending: Pending[] = []
-
-  for (const analyzer of registry.list()) {
-    for (const match of analyzer.detect(text)) {
-      try {
-        const result = await Promise.resolve(analyzer.analyze(match))
-        const range = match.range
-          ? rangeForOffsets(match.range.start, match.range.end, lineStarts, text)
-          : rangeForLine(0, text.length)
-        for (const finding of result.findings) {
-          pending.push({ finding, analyzerId: analyzer.id, range })
-        }
-      } catch {
-        // analyzer can't decode this match — skip
-      }
-    }
-  }
+  const pending = await collectPending(text, registry, lineStarts)
 
   if (pending.length === 0) {
     emitMetrics({ scanned: 0, droppedBySeverityOverride: 0, droppedByDisableComments: 0 })
     return []
   }
 
-  // 1. Apply per-rule severity overrides first so `off` drops findings
-  //    even when no inline disable directive matches. We annotate each
-  //    finding with its pending index so we can round-trip back to the
-  //    source range / analyzer-id without re-running detect/analyze.
-  const overrides = options.ruleSeverity ?? {}
-  type TaggedFinding = Finding & { __idx: number }
-  const taggedForOverrides: TaggedFinding[] = pending.map((p, idx) => ({
-    ...p.finding,
-    __idx: idx,
-  }))
-  const afterOverrides = applySeverityOverrides(
-    taggedForOverrides,
-    overrides
-  ) as TaggedFinding[]
+  const { overridden, dropped: droppedBySeverityOverride } = runSeverityOverrides(
+    pending,
+    options.ruleSeverity ?? {},
+    emitSuppression
+  )
 
-  // Emit one suppression event per finding the override pass dropped.
-  // The set of surviving indices is small enough that the
-  // O(pending) diff stays cheap; the alternative (rewriting the
-  // override mapper to surface drop reasons) would leak provider-
-  // facing concerns into a pure helper.
-  const survivedOverrideIndices = new Set<number>()
-  for (const tagged of afterOverrides) survivedOverrideIndices.add(tagged.__idx)
-  let droppedBySeverityOverride = 0
-  for (let i = 0; i < pending.length; i++) {
-    if (survivedOverrideIndices.has(i)) continue
-    droppedBySeverityOverride++
-    emitSuppression({
-      reason: 'severityOverride',
-      findingId: pending[i].finding.id,
-      analyzerId: pending[i].analyzerId,
-      startLine: pending[i].range.startLine,
-    })
-  }
-
-  if (afterOverrides.length === 0) {
-    emitMetrics({
-      scanned: pending.length,
-      droppedBySeverityOverride,
-      droppedByDisableComments: 0,
-    })
+  if (overridden.length === 0) {
+    emitMetrics({ scanned: pending.length, droppedBySeverityOverride, droppedByDisableComments: 0 })
     return []
   }
-
-  // Rebuild the pending list with the (potentially) updated severity
-  // values so downstream consumers (and the disable-comment filter's
-  // tag round-trip) see the right shape.
-  const overridden: Pending[] = afterOverrides.map((finding) => {
-    const original = pending[finding.__idx]
-    const { __idx: _ignored, ...cleanFinding } = finding
-    return {
-      finding: cleanFinding as Finding,
-      analyzerId: original.analyzerId,
-      range: original.range,
-    }
-  })
 
   // 2. Apply inline-disable-comments at the registry boundary so all
   //    downstream consumers (diagnostics, code lens, tree view, status
@@ -265,7 +261,7 @@ function rangeForOffsets(
 function computeLineStarts(text: string): number[] {
   const starts = [0]
   for (let i = 0; i < text.length; i++) {
-    if (text.charCodeAt(i) === 10) starts.push(i + 1)
+    if (text.codePointAt(i) === 10) starts.push(i + 1)
   }
   return starts
 }

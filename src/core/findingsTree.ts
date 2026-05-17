@@ -124,47 +124,47 @@ const SEVERITY_RANK: Record<Severity, number> = {
  * The function never throws and never reads from anything but the
  * provided findings list. No vscode imports.
  */
+function countSeverities(bucket: readonly WorkspaceFinding[]): { errorCount: number; warningCount: number; infoCount: number } {
+  let errorCount = 0
+  let warningCount = 0
+  let infoCount = 0
+  for (const entry of bucket) {
+    if (entry.finding.severity === 'error') errorCount++
+    else if (entry.finding.severity === 'warning') warningCount++
+    else infoCount++
+  }
+  return { errorCount, warningCount, infoCount }
+}
+
+function groupByAnalyzer(findings: readonly WorkspaceFinding[]): Map<string, WorkspaceFinding[]> {
+  const groups = new Map<string, WorkspaceFinding[]>()
+  for (const entry of findings) {
+    if (!entry?.finding) continue
+    const bucket = groups.get(entry.analyzerId) ?? []
+    if (bucket.length === 0) groups.set(entry.analyzerId, bucket)
+    bucket.push(entry)
+  }
+  return groups
+}
+
 export function buildTree(findings: readonly WorkspaceFinding[] | undefined | null): TreeNodeDto[] {
   if (!findings || findings.length === 0) return []
 
-  const groups = new Map<string, WorkspaceFinding[]>()
-  for (const entry of findings) {
-    if (!entry || !entry.finding) continue
-    const key = entry.analyzerId
-    let bucket = groups.get(key)
-    if (!bucket) {
-      bucket = []
-      groups.set(key, bucket)
-    }
-    bucket.push(entry)
-  }
-
+  const groups = groupByAnalyzer(findings)
   const roots: TreeNodeDto[] = []
   for (const [analyzerId, bucket] of groups) {
     if (bucket.length === 0) continue
     const analyzerName = bucket[0].analyzerName
-
-    const sorted = bucket.slice().sort(compareFindings)
+    const sorted = bucket.slice().sort(compareByLocation)
     const children: TreeNodeDto[] = sorted.map((entry, index) => buildFindingNode(entry, analyzerId, index))
-
-    let errorCount = 0
-    let warningCount = 0
-    let infoCount = 0
-    for (const entry of bucket) {
-      if (entry.finding.severity === 'error') errorCount++
-      else if (entry.finding.severity === 'warning') warningCount++
-      else infoCount++
-    }
-
+    const counts = countSeverities(bucket)
     roots.push({
       id: `analyzer:${analyzerId}`,
       kind: 'analyzerRoot',
       label: `${analyzerName} (${bucket.length})`,
       analyzerId,
       analyzerName,
-      errorCount,
-      warningCount,
-      infoCount,
+      ...counts,
       children,
     })
   }
@@ -193,7 +193,12 @@ function buildFindingNode(
   }
 }
 
-function compareFindings(a: WorkspaceFinding, b: WorkspaceFinding): number {
+interface HasLocation {
+  filePath: string
+  range: { startLine: number; startColumn: number }
+}
+
+function compareByLocation(a: HasLocation, b: HasLocation): number {
   const pathDelta = a.filePath.localeCompare(b.filePath)
   if (pathDelta !== 0) return pathDelta
   const lineDelta = a.range.startLine - b.range.startLine
@@ -232,7 +237,7 @@ export function buildTokenTree(
   tokens: readonly WorkspaceToken[] | undefined | null
 ): TreeNodeDto[] {
   if (!tokens || tokens.length === 0) return []
-  const sorted = tokens.slice().sort(compareTokenLocation)
+  const sorted = tokens.slice().sort(compareByLocation)
   return sorted.map((token, index) => buildTokenRoot(token, index))
 }
 
@@ -327,14 +332,6 @@ function buildFindingsGroup(
   }
 }
 
-function compareTokenLocation(a: WorkspaceToken, b: WorkspaceToken): number {
-  const pathDelta = a.filePath.localeCompare(b.filePath)
-  if (pathDelta !== 0) return pathDelta
-  const lineDelta = a.range.startLine - b.range.startLine
-  if (lineDelta !== 0) return lineDelta
-  return a.range.startColumn - b.range.startColumn
-}
-
 function stringifyRowValue(v: unknown): string {
   if (v === null || v === undefined) return ''
   if (typeof v === 'string') return v
@@ -342,7 +339,7 @@ function stringifyRowValue(v: unknown): string {
   try {
     return JSON.stringify(v)
   } catch {
-    return String(v)
+    return '[unserializable]'
   }
 }
 

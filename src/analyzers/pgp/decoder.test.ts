@@ -9,7 +9,7 @@ import { decodePgp } from './decoder'
 
 function bytesToBase64(bytes: Uint8Array): string {
   let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i])
+  for (const b of bytes) s += String.fromCodePoint(b)
   return btoa(s)
 }
 

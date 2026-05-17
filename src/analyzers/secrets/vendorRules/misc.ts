@@ -79,12 +79,16 @@ const DIGITALOCEAN_PAT: SecretRule = {
   id: 'secret.digitalocean.personalAccessToken',
   vendor: 'digitalocean',
   name: 'DigitalOcean personal access token (dop_v1_…)',
-  pattern: /(?<![A-Za-z0-9_])dop_v1_[a-f0-9]{64}(?![A-Za-z0-9])/g,
+  pattern: /(?<!\w)dop_v1_[a-f0-9]{64}(?![A-Za-z0-9])/g,
   severity: 'error',
   description:
     'DigitalOcean personal access token. Grants full DigitalOcean API access (droplets, networking, billing) on behalf of the issuing user — revoke immediately via the DigitalOcean control panel if leaked.',
   docUrl: 'https://docs.digitalocean.com/reference/api/create-personal-access-token/',
 }
+
+const UUID_HEX = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+const SNYK_LABEL = '(?:SNYK_TOKEN|SNYK_API_TOKEN|snyk_token|snyk_api_token|snykToken|snykApiToken)'
+const HEROKU_LABEL = '(?:HEROKU_API_KEY|HEROKU_AUTH_TOKEN|heroku_api_key|heroku_auth_token|herokuApiKey|herokuAuthToken)'
 
 // Snyk tokens are UUID-shaped (8-4-4-4-12 lowercase hex with hyphens, 36
 // chars total) and we only flag the env-labelled `SNYK_TOKEN=<uuid>` form
@@ -93,16 +97,13 @@ const SNYK_TOKEN_LABELLED: SecretRule = {
   id: 'secret.snyk.tokenLabelled',
   vendor: 'snyk',
   name: 'Snyk API token (env-labelled SNYK_TOKEN=)',
-  pattern: /(?:SNYK_TOKEN|SNYK_API_TOKEN|snyk_token|snyk_api_token|snykToken|snykApiToken)["']?\s*[:=]\s*["']?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}["']?/g,
+  pattern: new RegExp(String.raw`${SNYK_LABEL}["']?\s*[:=]\s*["']?${UUID_HEX}["']?`, 'g'),
   severity: 'error',
   description:
     'Snyk API token (UUID) referenced via env var. Grants Snyk API access (project tests, monitor, settings) on behalf of the issuing user / service account — revoke immediately via the Snyk dashboard if leaked.',
   docUrl: 'https://docs.snyk.io/snyk-api/authentication-for-api',
   sensitiveSpan: (raw) =>
-    sensitiveAfterDelimiter(
-      raw,
-      /[:=]\s*["']?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/
-    ),
+    sensitiveAfterDelimiter(raw, new RegExp(String.raw`[:=]\s*["']?(${UUID_HEX})`)),
 }
 
 // Heroku API keys are UUID-shaped (8-4-4-4-12 lowercase hex with hyphens,
@@ -113,16 +114,13 @@ const HEROKU_API_KEY_LABELLED: SecretRule = {
   id: 'secret.heroku.apiKeyLabelled',
   vendor: 'heroku',
   name: 'Heroku API key (env-labelled HEROKU_API_KEY=)',
-  pattern: /(?:HEROKU_API_KEY|HEROKU_AUTH_TOKEN|heroku_api_key|heroku_auth_token|herokuApiKey|herokuAuthToken)["']?\s*[:=]\s*["']?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}["']?/g,
+  pattern: new RegExp(String.raw`${HEROKU_LABEL}["']?\s*[:=]\s*["']?${UUID_HEX}["']?`, 'g'),
   severity: 'error',
   description:
     'Heroku API key (UUID) referenced via env var. Grants full Heroku Platform API access (apps, dynos, config vars, billing) on behalf of the issuing user — revoke immediately via `heroku authorizations:revoke` if leaked.',
   docUrl: 'https://devcenter.heroku.com/articles/platform-api-quickstart#authentication',
   sensitiveSpan: (raw) =>
-    sensitiveAfterDelimiter(
-      raw,
-      /[:=]\s*["']?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/
-    ),
+    sensitiveAfterDelimiter(raw, new RegExp(String.raw`[:=]\s*["']?(${UUID_HEX})`)),
 }
 
 export const MISC_SECRET_RULES: SecretRule[] = [
