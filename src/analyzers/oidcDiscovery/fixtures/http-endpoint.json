@@ -1,0 +1,9 @@
+{
+  "issuer": "http://localhost:8080/issuer",
+  "authorization_endpoint": "http://localhost:8080/oauth2/authorize",
+  "token_endpoint": "http://localhost:8080/oauth2/token",
+  "userinfo_endpoint": "http://localhost:8080/oauth2/userinfo",
+  "jwks_uri": "http://localhost:8080/oauth2/jwks",
+  "id_token_signing_alg_values_supported": ["RS256"],
+  "scopes_supported": ["openid"]
+}

@@ -1,0 +1,6 @@
+{
+  "kty": "RSA",
+  "n": "ypmcrCmdjR4DJM5wEbvHVkFeVhnly1Jddh8evsPFgfDbkq1ae5tGNkdoE1JEGUn-sLhUasY4AkjWdvbvtdkcF25VvqOJIkzqm7tAS9D0McSPsldgdchUpGmjJwA0LXiBJeschZfvSfAnaj37YQd8oX4UgrMzV6qixQZguU9-Jjs",
+  "e": "AQAB",
+  "kid": "rsa-1024"
+}

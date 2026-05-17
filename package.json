@@ -1,0 +1,250 @@
+{
+  "name": "vscode-token-xray",
+  "displayName": "Token X-Ray",
+  "description": "X-ray vision for tokens and secrets: locally inspect JWTs, SAML assertions, certificates, OAuth tokens, and detect credentials in any file. No data leaves your machine.",
+  "version": "1.0.0",
+  "publisher": "AndrewButson",
+  "icon": "images/logo_128x128.png",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arbs-io/vscode-token-xray.git"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/arbs-io"
+  },
+  "engines": {
+    "vscode": "^1.81.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "workspaces": [
+    "webview"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=es2020",
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run build && npm run -S esbuild-base -- --sourcemap --watch",
+    "test-compile": "tsc -p ./",
+    "typecheck": "tsc -p ./ --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "deploy": "vsce publish --yarn",
+    "clean": "node ./utilities/scripts/clean.js"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "browser": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tokenXray",
+          "title": "Token X-Ray",
+          "icon": "images/vscode-token-xray.svg"
+        }
+      ]
+    },
+    "views": {
+      "tokenXray": [
+        {
+          "id": "tokenXray.findings",
+          "name": "Findings"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "jwt",
+        "aliases": [
+          "JWT",
+          "Json Web Token"
+        ],
+        "firstLine": "^eyJ[A-Za-z0-9_=-]+\\.[A-Za-z0-9_=-]*\\.[A-Za-z0-9_=-]*(?:\\.[A-Za-z0-9_=-]+\\.[A-Za-z0-9_=-]+)?$",
+        "extensions": [
+          ".jwt"
+        ],
+        "icon": {
+          "light": "./images/vscode-token-xray-light.png",
+          "dark": "./images/vscode-token-xray-dark.png"
+        }
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "tokenXray.showJsonPreviewCommand",
+          "when": "editorLangId == jwt",
+          "group": "navigation"
+        },
+        {
+          "command": "tokenXray.showClaimsetPreviewCommand",
+          "when": "editorLangId == jwt",
+          "group": "navigation"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "tokenXray.showJsonPreviewCommand",
+        "title": "Token X-Ray: Show token as decoded JSON",
+        "category": "Token X-Ray",
+        "icon": "$(json)"
+      },
+      {
+        "command": "tokenXray.showClaimsetPreviewCommand",
+        "title": "Token X-Ray: Show rendered claimset",
+        "category": "Token X-Ray",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "tokenXray.inspect",
+        "title": "Token X-Ray: Inspect token",
+        "category": "Token X-Ray"
+      }
+    ],
+    "semanticTokenTypes": [
+      {
+        "id": "jwt_joseHeader",
+        "description": "JOSE header (JWS or JWE)"
+      },
+      {
+        "id": "jwt_claimsSet",
+        "description": "JWS claims set"
+      },
+      {
+        "id": "jwt_signature",
+        "description": "JWS signature"
+      },
+      {
+        "id": "jwt_encryptedKey",
+        "description": "JWE encrypted key"
+      },
+      {
+        "id": "jwt_iv",
+        "description": "JWE initialization vector"
+      },
+      {
+        "id": "jwt_ciphertext",
+        "description": "JWE ciphertext"
+      },
+      {
+        "id": "jwt_authTag",
+        "description": "JWE authentication tag"
+      }
+    ],
+    "configuration": {
+      "title": "Token X-Ray",
+      "properties": {
+        "tokenXray.jwt.verifySignature": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, the JWT claimset view runs signature verification using keys configured below."
+        },
+        "tokenXray.jwt.expectedIssuer": {
+          "type": "string",
+          "default": "",
+          "description": "If set, signature verification also asserts the iss claim equals this value."
+        },
+        "tokenXray.jwt.expectedAudience": {
+          "type": "string",
+          "default": "",
+          "description": "If set, signature verification also asserts the aud claim equals this value."
+        },
+        "tokenXray.jwt.keys": {
+          "type": "array",
+          "default": [],
+          "description": "Keys used to verify JWT signatures. Items are JWK objects, or { pem: string, alg: string, kid?: string }, or { secret: string, alg: 'HS256'|'HS384'|'HS512', kid?: string }.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "tokenXray.secrets.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, secret-scanner findings (private keys, vendor API tokens, etc.) are published as diagnostics. Findings from JWT / SAML / X509 / JWK / OAuth / cookie analyzers are unaffected by this setting."
+        },
+        "tokenXray.secrets.exclude": {
+          "type": "array",
+          "default": [],
+          "description": "Gitignore-style glob patterns (relative to the workspace folder) for files where the secret scanner should be skipped. Only secret findings are filtered — other analyzers still run.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tokenXray.secrets.maxFileSizeBytes": {
+          "type": "number",
+          "default": 1048576,
+          "description": "Skip the secret scanner when a document's text length (in characters) exceeds this value. Defaults to 1 MiB. Other analyzers still run."
+        },
+        "tokenXray.secrets.codeActions.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, secret-scanner diagnostics offer Quick Fix code actions (Redact / Move to .env.example). Toggle off to silence the lightbulb on secret diagnostics."
+        },
+        "tokenXray.inlayHints.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline expiry/severity hints next to detected tokens."
+        },
+        "tokenXray.ruleSeverity": {
+          "type": "object",
+          "default": {},
+          "description": "Override the severity of specific rule ids. Use `off` to suppress. Wildcard `id.*` matches all rules with that prefix.",
+          "additionalProperties": {
+            "enum": [
+              "error",
+              "warning",
+              "info",
+              "off"
+            ]
+          }
+        },
+        "tokenXray.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log scan counts and finding suppressions to the Token X-Ray output channel for troubleshooting."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "editor.wordWrap": "on",
+      "workbench.editor.languageDetection": true,
+      "editor.semanticTokenColorCustomizations": {
+        "enabled": true,
+        "rules": {
+          "jwt_joseHeader": "#ce60b2",
+          "jwt_claimsSet": "#a790e6",
+          "jwt_signature": "#84dd69",
+          "jwt_encryptedKey": "#e6a23c",
+          "jwt_iv": "#5a9bd4",
+          "jwt_ciphertext": "#a790e6",
+          "jwt_authTag": "#84dd69"
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "@types/vscode": "^1.81.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.3",
+    "@typescript-eslint/parser": "^8.59.3",
+    "@vitest/coverage-v8": "^4.1.6",
+    "@vscode/vsce": "^3.9.1",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.4.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.8.0",
+    "jose": "^6.2.3"
+  }
+}

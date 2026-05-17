@@ -1,0 +1,30 @@
+HTTP/1.1 200 OK
+Content-Type: text/html
+Cache-Control: no-cache
+
+# Healthy session cookie — no findings
+Set-Cookie: session=abc123def; Secure; HttpOnly; SameSite=Strict; Max-Age=3600; Path=/
+
+# Sensitive cookie missing HttpOnly — XSS risk
+Set-Cookie: jwt=eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0.sig; Secure; SameSite=Lax; Max-Age=3600
+
+# Sensitive cookie missing Secure — would travel over plaintext HTTP
+Set-Cookie: auth=token123; HttpOnly; SameSite=Lax; Max-Age=3600
+
+# SameSite=None without Secure — browsers reject this combination
+Set-Cookie: cross_site=value; SameSite=None; Path=/
+
+# Session cookie (no Expires / Max-Age)
+Set-Cookie: tracking=abc; Path=/
+
+# Non-sensitive cookie — only triggers the "no expiry" hint
+Set-Cookie: locale=en-US; Path=/; Max-Age=86400
+
+# Cookie value is a JWT — recursively inspectable
+Set-Cookie: access_token=eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0.sig; Secure; HttpOnly; SameSite=Strict; Max-Age=300
+
+# Cookie deletion (negative Max-Age)
+Set-Cookie: stale=; Max-Age=-1; Path=/
+
+# Overly broad Domain — public suffix
+Set-Cookie: bad=1; Domain=.com; Secure

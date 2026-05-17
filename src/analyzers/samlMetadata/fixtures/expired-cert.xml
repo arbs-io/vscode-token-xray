@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                     xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                     entityID="https://idp.expired.example.test/">
+  <ds:Signature>
+    <ds:SignedInfo>
+      <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+      <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+      <ds:Reference URI="">
+        <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+        <ds:DigestValue>placeholder</ds:DigestValue>
+      </ds:Reference>
+    </ds:SignedInfo>
+    <ds:SignatureValue>placeholder</ds:SignatureValue>
+  </ds:Signature>
+  <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing">
+      <ds:KeyInfo>
+        <ds:X509Data>
+          <ds:X509Certificate>MIIDHzCCAgegAwIBAgIUV2YmrszjWgR/bFx+zPbnxM++yM4wDQYJKoZIhvcNAQELBQAwHzEdMBsGA1UEAwwUZXhwaXJlZC5leGFtcGxlLnRlc3QwHhcNMjQwMTAxMDAwMDAwWhcNMjQwMTAyMDAwMDAwWjAfMR0wGwYDVQQDDBRleHBpcmVkLmV4YW1wbGUudGVzdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAK6oMuLgnaL7psarYYrdViqjC6lzaxPDo+gBt7WZ5Cg5Frh05YMSGgBB/d69aJurvQiQmI8K+TWsfzWrfRbizEL86CABtkP12aiK+cT3iN0FDXRIY5pFM8z7gSwQ8ssbEUx4dTRDmmRm63fb79PN/XYtszFOynJg+evj9Sq1xOamxX4kM0eb5RBIOOiW9wjP47SK/WkgqUcGxNyrROTtSNMAhwUdlg6HDx7ZH7i/lXiZHOPOA95c5Bj0h5MetDRLfX7b32Skc4O3MCiFO8IZU8CDGqV0AEU1tPOsI70VkPU74NKwcxeg6w3FXJiUIbQgvexF+KfjVFgjqWfpTq3x4sUCAwEAAaNTMFEwHQYDVR0OBBYEFJTHr78uKbNFazuY+KlEUIRE54HKMB8GA1UdIwQYMBaAFJTHr78uKbNFazuY+KlEUIRE54HKMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAFsL0tUTZaU9g4WfvtuL8HaPG3/TJkNLAj0kMmj+p28a0szOgkchIPJ67xLj6FCIdn6rzkA1bvanalyHxsrb82xbK0X3+QgsAeyrFq/I0HFskyS0hM/4TVfue63vODpzQdFSswkzouGbPJ0gNNUXnGcgAfMeSwC2RsDfliBcoZCUahcbiY94gkKUArlOR3ZFzgZNcF9FNEZxDlI3zG7irM7G2tw7rEZEf4ZkQS3CZi2fSzNIrI9oicgVYMmW8Kuw2NwiBoCKquUsfZfIdB9Tq64NrR0//qoB7/5UKHfG1Gtp5Sfozsszbyvl93aJktAiJOzFKXgeGxzGOMCsGvfEe8U=</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>
+  </md:IDPSSODescriptor>
+</md:EntityDescriptor>

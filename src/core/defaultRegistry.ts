@@ -1,0 +1,38 @@
+import { AwsSigv4Analyzer } from '../analyzers/awsSigv4/analyzer'
+import { BasicAuthAnalyzer } from '../analyzers/basicAuth/analyzer'
+import { CookieAnalyzer } from '../analyzers/cookie/analyzer'
+import { CsrAnalyzer } from '../analyzers/csr/analyzer'
+import { HttpSignatureAnalyzer } from '../analyzers/httpSignature/analyzer'
+import { JwkAnalyzer } from '../analyzers/jwk/analyzer'
+import { JwtAnalyzer } from '../analyzers/jwt/analyzer'
+import { OAuthTokenAnalyzer } from '../analyzers/oauth/analyzer'
+import { OidcDiscoveryAnalyzer } from '../analyzers/oidcDiscovery/analyzer'
+import { PasetoAnalyzer } from '../analyzers/paseto/analyzer'
+import { PgpAnalyzer } from '../analyzers/pgp/analyzer'
+import { SamlAnalyzer } from '../analyzers/saml/analyzer'
+import { SamlMetadataAnalyzer } from '../analyzers/samlMetadata/analyzer'
+import { SecretAnalyzer } from '../analyzers/secrets/analyzer'
+import { SshKeyAnalyzer } from '../analyzers/sshKey/analyzer'
+import { X509Analyzer } from '../analyzers/x509/analyzer'
+import { AnalyzerRegistry } from './registry'
+
+export function createDefaultRegistry(): AnalyzerRegistry {
+  const registry = new AnalyzerRegistry()
+  registry.register(new JwtAnalyzer())
+  registry.register(new SamlAnalyzer())
+  registry.register(new SamlMetadataAnalyzer())
+  registry.register(new X509Analyzer())
+  registry.register(new JwkAnalyzer())
+  registry.register(new OAuthTokenAnalyzer())
+  registry.register(new OidcDiscoveryAnalyzer())
+  registry.register(new CookieAnalyzer())
+  registry.register(new PasetoAnalyzer())
+  registry.register(new BasicAuthAnalyzer())
+  registry.register(new AwsSigv4Analyzer())
+  registry.register(new CsrAnalyzer())
+  registry.register(new SshKeyAnalyzer())
+  registry.register(new PgpAnalyzer())
+  registry.register(new HttpSignatureAnalyzer())
+  registry.register(new SecretAnalyzer())
+  return registry
+}
