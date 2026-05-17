@@ -64,20 +64,20 @@ const BUILDKITE_API_TOKEN: SecretRule = {
 // hyphens, 36 chars total). A bare UUID is too generic to flag safely so
 // we only match the labelled `CODECOV_TOKEN=<uuid>` env form. The
 // sensitiveSpan covers just the UUID half of the match.
+const CODECOV_LABEL = '(?:CODECOV_TOKEN|CODECOV_UPLOAD_TOKEN|codecov_token|codecovToken)'
+const UUID_HEX = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+
 const CODECOV_UPLOAD_TOKEN_LABELLED: SecretRule = {
   id: 'secret.codecov.uploadTokenLabelled',
   vendor: 'codecov',
   name: 'Codecov upload token (env-labelled CODECOV_TOKEN=)',
-  pattern: /(?:CODECOV_TOKEN|CODECOV_UPLOAD_TOKEN|codecov_token|codecovToken)["']?\s*[:=]\s*["']?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}["']?/g,
+  pattern: new RegExp(String.raw`${CODECOV_LABEL}["']?\s*[:=]\s*["']?${UUID_HEX}["']?`, 'g'),
   severity: 'error',
   description:
     'Codecov upload token (UUID) referenced via env var. Grants coverage upload rights on behalf of the issuing repository — rotate immediately if leaked.',
   docUrl: 'https://docs.codecov.com/docs/codecov-uploader',
   sensitiveSpan: (raw) =>
-    sensitiveAfterDelimiter(
-      raw,
-      /[:=]\s*["']?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/
-    ),
+    sensitiveAfterDelimiter(raw, new RegExp(String.raw`[:=]\s*["']?(${UUID_HEX})`)),
 }
 
 export const CI_SECRET_RULES: SecretRule[] = [

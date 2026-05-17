@@ -54,11 +54,15 @@ const CLIENT_SECRET: SecretRule = {
   sensitiveSpan: (raw) => sensitiveAfterDelimiter(raw, /[:=]\s*["']?([A-Za-z0-9~._-]{32,})/),
 }
 
+const GUID_HEX = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+const SUBSCRIPTION_LABEL = '(?:AZURE_SUBSCRIPTION_ID|ARM_SUBSCRIPTION_ID|azure_subscription_id|azureSubscriptionId)'
+const TENANT_LABEL = '(?:AZURE_TENANT_ID|AAD_TENANT_ID|ARM_TENANT_ID|azure_tenant_id|azureTenantId)'
+
 const SUBSCRIPTION_ID: SecretRule = {
   id: 'secret.azure.subscriptionId',
   vendor: 'azure',
   name: 'Azure subscription ID (labelled)',
-  pattern: /(?:AZURE_SUBSCRIPTION_ID|ARM_SUBSCRIPTION_ID|azure_subscription_id|azureSubscriptionId)["']?\s*[:=]\s*["']?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}["']?/g,
+  pattern: new RegExp(String.raw`${SUBSCRIPTION_LABEL}["']?\s*[:=]\s*["']?${GUID_HEX}["']?`, 'g'),
   severity: 'info',
   description: 'Azure subscription identifier. Not a secret on its own but identifies your account to an attacker.',
   sensitiveSpan: (raw) => sensitiveAfterDelimiter(raw, /[:=]\s*["']?([0-9a-fA-F-]{36})/),
@@ -68,7 +72,7 @@ const TENANT_ID: SecretRule = {
   id: 'secret.azure.tenantId',
   vendor: 'azure',
   name: 'Azure / Entra tenant ID (labelled)',
-  pattern: /(?:AZURE_TENANT_ID|AAD_TENANT_ID|ARM_TENANT_ID|azure_tenant_id|azureTenantId)["']?\s*[:=]\s*["']?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}["']?/g,
+  pattern: new RegExp(String.raw`${TENANT_LABEL}["']?\s*[:=]\s*["']?${GUID_HEX}["']?`, 'g'),
   severity: 'info',
   description: 'Entra ID tenant identifier. Identifier only — not a secret but identifies your directory.',
   sensitiveSpan: (raw) => sensitiveAfterDelimiter(raw, /[:=]\s*["']?([0-9a-fA-F-]{36})/),
