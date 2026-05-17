@@ -40,7 +40,7 @@ export function parseIgnoreFile(text: string): string[] {
     // Leading whitespace is significant for `.gitignore`; we follow
     // suit and only skip lines whose *entire* content is whitespace
     // (handled by the trim above leaving "").
-    if (trimmed[0] === '#') continue
+    if (trimmed.startsWith('#')) continue
     out.push(trimmed)
   }
   return out
@@ -68,16 +68,13 @@ export function matchIgnore(relPath: string, patterns: readonly string[]): boole
   let ignored = false
   for (const pattern of patterns) {
     if (!pattern) continue
-    if (pattern[0] === '!') {
+    if (pattern.startsWith('!')) {
       const body = pattern.slice(1)
-      if (!body) continue
-      if (matchesGlob(relPath, body)) {
+      if (body && matchesGlob(relPath, body)) {
         ignored = false
       }
-    } else {
-      if (matchesGlob(relPath, pattern)) {
-        ignored = true
-      }
+    } else if (matchesGlob(relPath, pattern)) {
+      ignored = true
     }
   }
   return ignored
