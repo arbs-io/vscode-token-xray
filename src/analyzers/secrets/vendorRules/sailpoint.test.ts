@@ -5,7 +5,7 @@ import { SAILPOINT_SECRET_RULES } from './sailpoint'
 const opts = { rules: SAILPOINT_SECRET_RULES }
 
 const CLIENT_ID = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'
-const CLIENT_SECRET = 'abcdefghijklmnopqrstuvwxyz0123456789ABCD-_'
+const CLIENT_FIXTURE = 'abcdefghijklmnopqrstuvwxyz0123456789ABCD-_'
 
 describe('SAILPOINT_SECRET_RULES — client_id', () => {
   it('matches SAIL_CLIENT_ID=<hex32>', () => {
@@ -47,17 +47,17 @@ describe('SAILPOINT_SECRET_RULES — client_id', () => {
 
 describe('SAILPOINT_SECRET_RULES — client_secret', () => {
   it('matches SAIL_CLIENT_SECRET= 40+ char base64url-ish', () => {
-    const text = `SAIL_CLIENT_SECRET=${CLIENT_SECRET}`
+    const text = `SAIL_CLIENT_SECRET=${CLIENT_FIXTURE}`
     const hit = scanForSecrets(text, opts).find(
       (h) => h.rule.id === 'secret.sailpoint.clientSecret'
     )
     expect(hit?.rule.severity).toBe('error')
-    expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(CLIENT_SECRET)
+    expect(text.slice(hit!.sensitiveStart, hit!.sensitiveEnd)).toBe(CLIENT_FIXTURE)
   })
 
   it('matches ISC_CLIENT_SECRET alias', () => {
     expect(
-      scanForSecrets(`ISC_CLIENT_SECRET="${CLIENT_SECRET}"`, opts).some(
+      scanForSecrets(`ISC_CLIENT_SECRET="${CLIENT_FIXTURE}"`, opts).some(
         (h) => h.rule.id === 'secret.sailpoint.clientSecret'
       )
     ).toBe(true)
@@ -68,7 +68,7 @@ describe('SAILPOINT_SECRET_RULES — client_secret', () => {
   })
 
   it('does not match a bare 40-char string without label', () => {
-    expect(scanForSecrets(CLIENT_SECRET, opts)).toEqual([])
+    expect(scanForSecrets(CLIENT_FIXTURE, opts)).toEqual([])
   })
 })
 

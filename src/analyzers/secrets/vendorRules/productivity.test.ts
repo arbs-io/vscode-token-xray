@@ -11,7 +11,7 @@ const NOTION_BODY_43 = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789ABCDEFG'
 const LINEAR_API_BODY_40 = 'AbCdEfGhIjKlMnOpQrStUvWxYz01234567890ABC'
 
 // Linear OAuth body: 40+ alnum characters (rule accepts {40,}).
-const LINEAR_OAUTH_BODY_40 = 'aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStT'
+const LINEAR_OAUTH_FIXTURE_40 = 'aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStT'
 
 // Figma PAT body: 40+ base64url-ish characters (rule accepts {40,}).
 const FIGMA_BODY_40 = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-Ab'
@@ -140,7 +140,7 @@ describe('PRODUCTIVITY_SECRET_RULES — Linear API key (lin_api_…)', () => {
 
 describe('PRODUCTIVITY_SECRET_RULES — Linear OAuth token (lin_oauth_…)', () => {
   it('matches lin_oauth_ + 40 alnum chars', () => {
-    const text = `lin_oauth_${LINEAR_OAUTH_BODY_40}`
+    const text = `lin_oauth_${LINEAR_OAUTH_FIXTURE_40}`
     const hit = scanForSecrets(text, opts).find(
       (h) => h.rule.id === 'secret.linear.oauthToken'
     )
@@ -150,7 +150,7 @@ describe('PRODUCTIVITY_SECRET_RULES — Linear OAuth token (lin_oauth_…)', () 
   })
 
   it('matches longer bodies (>40 alnum chars)', () => {
-    const longerBody = LINEAR_OAUTH_BODY_40 + 'ABCDEFGH'
+    const longerBody = LINEAR_OAUTH_FIXTURE_40 + 'ABCDEFGH'
     expect(
       scanForSecrets(`lin_oauth_${longerBody}`, opts).some(
         (h) => h.rule.id === 'secret.linear.oauthToken'
@@ -160,7 +160,7 @@ describe('PRODUCTIVITY_SECRET_RULES — Linear OAuth token (lin_oauth_…)', () 
 
   it('rejects body shorter than 40 chars', () => {
     expect(
-      scanForSecrets(`lin_oauth_${LINEAR_OAUTH_BODY_40.slice(0, 39)}`, opts).some(
+      scanForSecrets(`lin_oauth_${LINEAR_OAUTH_FIXTURE_40.slice(0, 39)}`, opts).some(
         (h) => h.rule.id === 'secret.linear.oauthToken'
       )
     ).toBe(false)
@@ -176,7 +176,7 @@ describe('PRODUCTIVITY_SECRET_RULES — Linear OAuth token (lin_oauth_…)', () 
 
   it('rejects token embedded in a longer identifier (alnum prefix)', () => {
     expect(
-      scanForSecrets(`xlin_oauth_${LINEAR_OAUTH_BODY_40}`, opts).some(
+      scanForSecrets(`xlin_oauth_${LINEAR_OAUTH_FIXTURE_40}`, opts).some(
         (h) => h.rule.id === 'secret.linear.oauthToken'
       )
     ).toBe(false)

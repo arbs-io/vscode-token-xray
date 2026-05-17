@@ -10,7 +10,7 @@ const SQUARE_ACCESS_BODY_60 = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCdEfGhIjK
 // 43 base64url-ish chars for the Square application secret body. Exactly 43
 // — the rule's `{43}` quantifier is exact, so a longer base64url tail would
 // fall foul of the trailing `(?![A-Za-z0-9_-])` lookahead.
-const SQUARE_APP_SECRET_BODY_43 = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCde'
+const SQUARE_APP_FIXTURE_43 = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCde'
 // 22 base64url-ish chars for the Square application id body.
 const SQUARE_APP_ID_BODY_22 = 'AbCdEfGhIjKl0123456_-X'
 // PayPal client-id half (lowercase alnum) and 32-hex suffix.
@@ -80,7 +80,7 @@ describe('PAYMENTS_SECRET_RULES — Square access token (EAAA…)', () => {
 
 describe('PAYMENTS_SECRET_RULES — Square application secret (sq0csp-)', () => {
   it('matches sq0csp- + 43 base64url chars', () => {
-    const text = `sq0csp-${SQUARE_APP_SECRET_BODY_43}`
+    const text = `sq0csp-${SQUARE_APP_FIXTURE_43}`
     const hit = scanForSecrets(text, opts).find(
       (h) => h.rule.id === 'secret.square.appSecret'
     )
@@ -91,7 +91,7 @@ describe('PAYMENTS_SECRET_RULES — Square application secret (sq0csp-)', () => 
 
   it('rejects body shorter than 43 chars', () => {
     expect(
-      scanForSecrets(`sq0csp-${SQUARE_APP_SECRET_BODY_43.slice(0, 42)}`, opts).some(
+      scanForSecrets(`sq0csp-${SQUARE_APP_FIXTURE_43.slice(0, 42)}`, opts).some(
         (h) => h.rule.id === 'secret.square.appSecret'
       )
     ).toBe(false)
@@ -107,7 +107,7 @@ describe('PAYMENTS_SECRET_RULES — Square application secret (sq0csp-)', () => 
 
   it('rejects token embedded in a longer identifier (alnum prefix)', () => {
     expect(
-      scanForSecrets(`xsq0csp-${SQUARE_APP_SECRET_BODY_43}`, opts).some(
+      scanForSecrets(`xsq0csp-${SQUARE_APP_FIXTURE_43}`, opts).some(
         (h) => h.rule.id === 'secret.square.appSecret'
       )
     ).toBe(false)
@@ -115,7 +115,7 @@ describe('PAYMENTS_SECRET_RULES — Square application secret (sq0csp-)', () => 
 
   it('rejects token with leading underscore (identifier-context)', () => {
     expect(
-      scanForSecrets(`x_sq0csp-${SQUARE_APP_SECRET_BODY_43}`, opts).some(
+      scanForSecrets(`x_sq0csp-${SQUARE_APP_FIXTURE_43}`, opts).some(
         (h) => h.rule.id === 'secret.square.appSecret'
       )
     ).toBe(false)
@@ -123,7 +123,7 @@ describe('PAYMENTS_SECRET_RULES — Square application secret (sq0csp-)', () => 
 
   it('rejects prefix mismatch (sq0idp- — application id, not secret)', () => {
     expect(
-      scanForSecrets(`sq0xsp-${SQUARE_APP_SECRET_BODY_43}`, opts).some(
+      scanForSecrets(`sq0xsp-${SQUARE_APP_FIXTURE_43}`, opts).some(
         (h) => h.rule.id === 'secret.square.appSecret'
       )
     ).toBe(false)
