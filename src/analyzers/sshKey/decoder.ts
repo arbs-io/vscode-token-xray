@@ -116,7 +116,7 @@ export function decodeSshKey(line: string): DecodedSshKey | undefined {
     case 'ssh-ed25519': {
       // ssh-ed25519: 32-byte public key.
       const pub = reader.readBytes()
-      if (!pub || pub.length !== 32) return undefined
+      if (pub?.length !== 32) return undefined
       return base
     }
     case 'ecdsa-sha2-nistp256':

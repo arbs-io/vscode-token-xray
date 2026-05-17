@@ -7,7 +7,8 @@ function fakeAnalyzer(id: string, pattern: RegExp): Analyzer {
     id,
     name: id,
     detect(text: string): Match[] {
-      return text.match(pattern) ? [{ text: text.match(pattern)![0] }] : []
+      const m = pattern.exec(text)
+      return m ? [{ text: m[0] }] : []
     },
     analyze() {
       return { analyzerId: id, kind: 'fake', sections: [], findings: [] }

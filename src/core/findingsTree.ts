@@ -129,7 +129,7 @@ export function buildTree(findings: readonly WorkspaceFinding[] | undefined | nu
 
   const groups = new Map<string, WorkspaceFinding[]>()
   for (const entry of findings) {
-    if (!entry || !entry.finding) continue
+    if (!entry?.finding) continue
     const key = entry.analyzerId
     let bucket = groups.get(key)
     if (!bucket) {

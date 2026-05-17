@@ -149,7 +149,7 @@ function deriveEnvKey(text: string, secretStart: number, ruleId: string): string
   // matches the patterns the secret rules already key off of.
   const lookBack = text.slice(Math.max(0, secretStart - 256), secretStart)
   // Match the rightmost label.
-  const labelMatch = lookBack.match(/(?:["'])?([A-Z][A-Z0-9_]{1,63})(?:["'])?\s*[:=]\s*["']?$/)
+  const labelMatch = /(?:["'])?([A-Z][A-Z0-9_]{1,63})(?:["'])?\s*[:=]\s*["']?$/.exec(lookBack)
   if (labelMatch) return labelMatch[1]
   return ruleIdToEnvKey(ruleId)
 }

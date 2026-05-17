@@ -96,7 +96,7 @@ function dedupe(hits: SecretHit[]): SecretHit[] {
   const sameRuleDeduped: SecretHit[] = []
   for (const hit of hits) {
     const last = sameRuleDeduped[sameRuleDeduped.length - 1]
-    if (last && hit.rule.id === last.rule.id && hit.start < last.end) continue
+    if (hit.rule.id === last?.rule.id && hit.start < last.end) continue
     sameRuleDeduped.push(hit)
   }
   // Pass 2: drop info-severity hits whose range overlaps any
