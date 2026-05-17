@@ -11,7 +11,9 @@ const NOTION_BODY_43 = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789ABCDEFG'
 const LINEAR_API_BODY_40 = 'AbCdEfGhIjKlMnOpQrStUvWxYz01234567890ABC'
 
 // Linear OAuth body: 40+ alnum characters (rule accepts {40,}).
-const LINEAR_OAUTH_FIXTURE_40 = 'aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStT'
+// Built from a short repeated chunk so static secret scanners do not
+// flag the fixture as a hard-coded credential.
+const LINEAR_OAUTH_FIXTURE_40 = 'AbCd0123'.repeat(5)
 
 // Figma PAT body: 40+ base64url-ish characters (rule accepts {40,}).
 const FIGMA_BODY_40 = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-Ab'
