@@ -83,7 +83,10 @@ export function decodeSamlMetadata(xml: string): DecodedSamlMetadata | undefined
     const root = parsed.EntitiesDescriptor as Record<string, unknown> | undefined
     if (!root) return undefined
     const eds = root.EntityDescriptor
-    const list = Array.isArray(eds) ? eds : eds === undefined ? [] : [eds]
+    let list: unknown[]
+    if (Array.isArray(eds)) list = eds
+    else if (eds === undefined) list = []
+    else list = [eds]
     const entities: SamlMetadataEntity[] = []
     for (const e of list) {
       const parsedEntity = parseEntity(e)

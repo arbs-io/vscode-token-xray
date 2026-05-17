@@ -80,8 +80,14 @@ function ed25519Key(): Uint8Array {
   return concat(lenPrefixed(ascii('ssh-ed25519')), lenPrefixed(pub))
 }
 
+const ECDSA_POINT_LEN: Record<'nistp256' | 'nistp384' | 'nistp521', number> = {
+  nistp256: 65,
+  nistp384: 97,
+  nistp521: 133,
+}
+
 function ecdsaKey(curve: 'nistp256' | 'nistp384' | 'nistp521'): Uint8Array {
-  const pointLen = curve === 'nistp256' ? 65 : curve === 'nistp384' ? 97 : 133
+  const pointLen = ECDSA_POINT_LEN[curve]
   const point = new Uint8Array(pointLen)
   point[0] = 0x04 // uncompressed-point marker
   for (let i = 1; i < pointLen; i++) point[i] = (i * 7) & 0xff

@@ -75,8 +75,14 @@ function ed25519Line(comment?: string): string {
   return comment ? `ssh-ed25519 ${bytesToBase64(body)} ${comment}` : `ssh-ed25519 ${bytesToBase64(body)}`
 }
 
+const ECDSA_POINT_LEN: Record<'nistp256' | 'nistp384' | 'nistp521', number> = {
+  nistp256: 65,
+  nistp384: 97,
+  nistp521: 133,
+}
+
 function ecdsaLine(curve: 'nistp256' | 'nistp384' | 'nistp521'): string {
-  const pointLen = curve === 'nistp256' ? 65 : curve === 'nistp384' ? 97 : 133
+  const pointLen = ECDSA_POINT_LEN[curve]
   const point = new Uint8Array(pointLen)
   point[0] = 0x04
   for (let i = 1; i < pointLen; i++) point[i] = (i * 7) & 0xff
