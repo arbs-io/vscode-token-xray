@@ -2,7 +2,6 @@
 
 > X-ray vision for tokens and secrets — inspect JWTs, SAML assertions, X.509 certificates, JWKs, OAuth tokens, and cookies, and detect credentials in any source file. Runs entirely locally; no data leaves your machine.
 
-<!-- TODO: re-point these badges after the repo move -->
 ![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/AndrewButson.vscode-token-xray)
 ![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/AndrewButson.vscode-token-xray)
 ![Visual Studio Marketplace Rating](https://img.shields.io/visual-studio-marketplace/r/AndrewButson.vscode-token-xray)
@@ -101,3 +100,7 @@ Sample fixtures live in `/sample` (JWTs, certificates, SAML responses, JWKs, coo
 If you find Token X-Ray useful, a rating on the Visual Studio Marketplace makes a real difference. Bugs and feature requests are very welcome on the GitHub issue tracker, and pull requests even more so.
 
 This is a personal passion project — sponsoring on GitHub helps keep time carved out for it.
+
+---
+
+<sub>Suggested GitHub repository description: **X-ray vision for tokens and secrets in VS Code — locally inspect JWTs, SAML, X.509, JWKs, OAuth tokens, cookies, and detect credentials in any file.**</sub>
