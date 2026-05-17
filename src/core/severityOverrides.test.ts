@@ -43,7 +43,7 @@ describe('applySeverityOverrides', () => {
         f({ id: 'jwt.alg.none', severity: 'warning' }),
         f({ id: 'secret.aws.akid', severity: 'error' }),
       ]
-      const snapshot = JSON.parse(JSON.stringify(findings))
+      const snapshot = structuredClone(findings)
       applySeverityOverrides(findings, {
         'jwt.alg.none': 'error',
         'secret.aws.akid': 'off',

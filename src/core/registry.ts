@@ -1,7 +1,7 @@
 import { Analyzer, Match } from './types'
 
 export class AnalyzerRegistry {
-  private analyzers = new Map<string, Analyzer>()
+  private readonly analyzers = new Map<string, Analyzer>()
 
   register(analyzer: Analyzer): void {
     if (this.analyzers.has(analyzer.id)) {

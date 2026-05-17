@@ -6,7 +6,7 @@ export class JwtDecoder {
 
   constructor(token: string) {
     if (typeof token !== 'string') {
-      throw new Error('Invalid token specified')
+      throw new TypeError('Invalid token specified')
     }
     try {
       const decoded = decodeJwt(token)

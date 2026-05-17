@@ -15,13 +15,12 @@ export interface ITokenListState {
 }
 
 function convertToISOString(isoString: number | undefined) {
+  if (isoString === undefined) {
+    return undefined
+  }
   try {
-    if (isoString === undefined) {
-      return undefined
-    }
-    const isoDate = new Date(1e3 * isoString).toISOString()
-    return isoDate
-  } catch (error) {
+    return new Date(1e3 * isoString).toISOString()
+  } catch {
     return undefined
   }
 }

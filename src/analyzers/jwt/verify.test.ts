@@ -1,5 +1,5 @@
 import { generateKeyPairSync, randomBytes } from 'node:crypto'
-import { exportJWK, exportSPKI, KeyObject, SignJWT } from 'jose'
+import { exportJWK, KeyObject, SignJWT } from 'jose'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { verifyJwt, VerifyKeySource } from './verify'
 
@@ -19,11 +19,13 @@ const HS_SECRET = 'super-secret-shared-key-1234567890'
 let rs: RsKeys
 let ec: EcKeys
 
+const DEFAULT_PAYLOAD: Record<string, unknown> = { sub: 'alice', iss: 'https://example.test' }
+
 async function makeJwt(
   alg: string,
   key: Parameters<SignJWT['sign']>[0],
   kid?: string,
-  payload: Record<string, unknown> = { sub: 'alice', iss: 'https://example.test' }
+  payload: Record<string, unknown> = DEFAULT_PAYLOAD
 ): Promise<string> {
   const signer = new SignJWT(payload).setProtectedHeader({ alg, ...(kid ? { kid } : {}) })
   return signer.sign(key)
