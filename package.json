@@ -171,6 +171,11 @@
           "type": "boolean",
           "default": true,
           "description": "When enabled, secret-scanner diagnostics offer Quick Fix code actions (Redact / Move to .env.example). Toggle off to silence the lightbulb on secret diagnostics."
+        },
+        "tokenXray.inlayHints.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline expiry/severity hints next to detected tokens."
         }
       }
     },
