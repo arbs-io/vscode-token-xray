@@ -1,7 +1,7 @@
 # Token X-Ray
 
 > [!NOTE]
-> X-ray vision for tokens and secrets — locally inspect JWTs, SAML assertions, X.509 certificates, JWKs, OAuth / PASETO / Basic / AWS SigV4 tokens, OpenSSH and PGP material, OIDC discovery documents, HTTP signatures, cookies, and detect credentials in any source file. Runs entirely locally; no data leaves your machine.
+> vscode-token-xray locally inspect JWTs, SAML assertions, X.509 certificates, JWKs, OAuth / PASETO / Basic / AWS SigV4 tokens, OpenSSH and PGP material, OIDC discovery documents, HTTP signatures, cookies, and detect credentials in any source file. Runs entirely locally; no data leaves your machine.
 
 ![Visual Studio Marketplace Version](https://vsmarketplacebadges.dev/version-short/AndrewButson.vscode-token-xray.svg)
 ![Visual Studio Marketplace Installs](https://vsmarketplacebadges.dev/installs-short/AndrewButson.vscode-token-xray.svg)
