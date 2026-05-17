@@ -40,7 +40,7 @@ describe('GCP_SECRET_RULES — OAuth client secret', () => {
   it('sensitiveSpan points to the value only', () => {
     const secret = 'GOCSPX-abcdefghijklmnopqrst'
     const text = `{"client_secret":"${secret}"}`
-    const [hit] = scanForSecrets(text, opts).filter((h) => h.rule.id === 'secret.gcp.oauthClientSecret')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.gcp.oauthClientSecret')!
     expect(text.slice(hit.sensitiveStart, hit.sensitiveEnd)).toBe(secret)
   })
 

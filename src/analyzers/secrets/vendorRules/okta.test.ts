@@ -14,7 +14,7 @@ describe('OKTA_SECRET_RULES — SSWS header', () => {
   it('sensitiveSpan points to the token, not the SSWS keyword', () => {
     const token = '00abcdefghijklmnopqrstuvwxyz1234567890ABCDEF'
     const text = `Authorization: SSWS ${token}`
-    const [hit] = scanForSecrets(text, opts).filter((h) => h.rule.id === 'secret.okta.sswsHeader')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.okta.sswsHeader')!
     expect(text.slice(hit.sensitiveStart, hit.sensitiveEnd)).toBe(token)
   })
 
@@ -47,7 +47,7 @@ describe('OKTA_SECRET_RULES — labelled OKTA_API_TOKEN', () => {
   it('sensitiveSpan covers the value only', () => {
     const token = '00abcdefghijklmnopqrstuvwxyz0123456789'
     const text = `OKTA_API_TOKEN=${token}`
-    const [hit] = scanForSecrets(text, opts).filter((h) => h.rule.id === 'secret.okta.apiToken')
+    const hit = scanForSecrets(text, opts).find((h) => h.rule.id === 'secret.okta.apiToken')!
     expect(text.slice(hit.sensitiveStart, hit.sensitiveEnd)).toBe(token)
   })
 })

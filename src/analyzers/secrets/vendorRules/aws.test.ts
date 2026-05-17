@@ -50,9 +50,9 @@ describe('AWS_SECRET_RULES — secret access key', () => {
 
   it('sensitiveSpan points to the value, not the label', () => {
     const text = `AWS_SECRET_ACCESS_KEY=${VALID_40}`
-    const [hit] = scanForSecrets(text, opts).filter(
+    const hit = scanForSecrets(text, opts).find(
       (h) => h.rule.id === 'secret.aws.secretAccessKey'
-    )
+    )!
     expect(text.slice(hit.sensitiveStart, hit.sensitiveEnd)).toBe(VALID_40)
   })
 
