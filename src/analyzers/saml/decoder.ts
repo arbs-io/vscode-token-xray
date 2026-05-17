@@ -91,7 +91,7 @@ function pick<T = unknown>(obj: unknown, ...path: string[]): T | undefined {
 function asString(value: unknown): string | undefined {
   if (typeof value === 'string') return value
   if (value && typeof value === 'object' && '#text' in value) {
-    return String((value as { '#text': unknown })['#text'])
+    return String(value['#text'])
   }
   return undefined
 }

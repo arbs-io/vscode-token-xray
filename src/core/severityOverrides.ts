@@ -93,7 +93,7 @@ export function applySeverityOverrides(
       out.push(finding)
       continue
     }
-    out.push({ ...finding, severity: override as Severity })
+    out.push({ ...finding, severity: override })
   }
   return out
 }

@@ -22,7 +22,7 @@ describe('buildHoverMarkdown', () => {
 
     it('falls back to "detection" when kind is undefined', () => {
       const md = buildHoverMarkdown(
-        makeResult({ analyzerId: 'jwt', kind: undefined as unknown as string })
+        makeResult({ analyzerId: 'jwt', kind: undefined as unknown })
       )
       expect(md).toContain('**JWT** — detection')
     })

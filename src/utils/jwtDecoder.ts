@@ -11,7 +11,7 @@ export class JwtDecoder {
     try {
       const decoded = decodeJwt(token)
       this.joseHeader = decoded.header
-      this.claimset = (decoded.payload ?? {}) as object
+      this.claimset = decoded.payload ?? {}
     } catch (e) {
       throw new Error(`Invalid token specified: ${(e as Error).message}`)
     }

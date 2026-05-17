@@ -110,7 +110,7 @@ describe('buildDocumentSymbolDtos', () => {
           makeHit({
             analyzerId: 'jwt',
             analyzerName: 'JSON Web Token (JWT)',
-            firstSection: makeSection({ rows: [{ key: 'alg', value: value as never }] }),
+            firstSection: makeSection({ rows: [{ key: 'alg', value }] }),
           }),
         ])
         expect(dtos[0].name, `value=${description}`).toBe('JSON Web Token (JWT): token')

@@ -193,7 +193,7 @@ export async function diagnosticsAcrossRegistry(
     const original = pending[finding.__idx]
     const { __idx: _ignored, ...cleanFinding } = finding
     return {
-      finding: cleanFinding as Finding,
+      finding: cleanFinding,
       analyzerId: original.analyzerId,
       range: original.range,
     }
