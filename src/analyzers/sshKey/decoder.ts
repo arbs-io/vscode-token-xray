@@ -71,7 +71,13 @@ export interface DecodedSshKey {
  * detect path in particular) need an idiomatic Optional to filter out
  * lines that merely look like SSH keys but aren't.
  */
-export function decodeSshKey(line: string): DecodedSshKey | undefined {
+interface ParsedLine {
+  type: string
+  body: string
+  comment?: string
+}
+
+function parseSshKeyLine(line: string): ParsedLine | undefined {
   if (typeof line !== 'string') return undefined
   const trimmed = line.trim()
   if (trimmed.length === 0) return undefined
@@ -89,32 +95,18 @@ export function decodeSshKey(line: string): DecodedSshKey | undefined {
 
   if (body.length === 0) return undefined
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body)) return undefined
+  return { type, body, comment }
+}
 
-  const bytes = base64ToBytes(body)
-  if (!bytes) return undefined
-
-  // The first wire field must be the algorithm name and must match the
-  // prefix on the line. This is the spec-mandated validation that makes
-  // false positives essentially impossible.
-  const reader = new WireReader(bytes)
-  const embeddedType = reader.readString()
-  if (embeddedType === undefined || embeddedType !== type) return undefined
-
-  const base: DecodedSshKey = {
-    type: type as SshKeyType,
-    ...(comment && comment.length > 0 ? { comment } : {}),
-  }
-
+function decodeByType(type: string, reader: WireReader, base: DecodedSshKey): DecodedSshKey | undefined {
   switch (type) {
     case 'ssh-rsa': {
-      // ssh-rsa: e (exponent), n (modulus).
       const e = reader.readBytes()
       const n = reader.readBytes()
       if (!e || !n) return undefined
       return { ...base, modulusBits: significantBitLength(n) }
     }
     case 'ssh-ed25519': {
-      // ssh-ed25519: 32-byte public key.
       const pub = reader.readBytes()
       if (pub?.length !== 32) return undefined
       return base
@@ -122,9 +114,7 @@ export function decodeSshKey(line: string): DecodedSshKey | undefined {
     case 'ecdsa-sha2-nistp256':
     case 'ecdsa-sha2-nistp384':
     case 'ecdsa-sha2-nistp521': {
-      // ecdsa-sha2-nistpXXX: curve identifier, then EC point.
       const curve = reader.readString()
-      if (!curve) return undefined
       const expected = ECDSA_CURVE_FOR[type]
       if (curve !== expected) return undefined
       const point = reader.readBytes()
@@ -144,6 +134,27 @@ export function decodeSshKey(line: string): DecodedSshKey | undefined {
     default:
       return undefined
   }
+}
+
+export function decodeSshKey(line: string): DecodedSshKey | undefined {
+  const parsed = parseSshKeyLine(line)
+  if (!parsed) return undefined
+  const { type, body, comment } = parsed
+
+  const bytes = base64ToBytes(body)
+  if (!bytes) return undefined
+
+  // The first wire field must be the algorithm name and must match the
+  // prefix on the line. This is the spec-mandated validation that makes
+  // false positives essentially impossible.
+  const reader = new WireReader(bytes)
+  if (reader.readString() !== type) return undefined
+
+  const base: DecodedSshKey = {
+    type: type as SshKeyType,
+    ...(comment && comment.length > 0 ? { comment } : {}),
+  }
+  return decodeByType(type, reader, base)
 }
 
 /* ------------------------------------------------------------------ *
