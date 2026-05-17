@@ -146,7 +146,7 @@ function pemToDer(pem: string): Uint8Array | undefined {
   try {
     const binary = atob(body)
     const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0
     return bytes
   } catch {
     return undefined
@@ -471,7 +471,7 @@ function decodeString(buf: Uint8Array, tlv: Tlv): string | undefined {
       if (slice.length % 2 !== 0) return undefined
       let out = ''
       for (let i = 0; i < slice.length; i += 2) {
-        out += String.fromCharCode((slice[i] << 8) | slice[i + 1])
+        out += String.fromCodePoint((slice[i] << 8) | slice[i + 1])
       }
       return out
     }
@@ -482,7 +482,7 @@ function decodeString(buf: Uint8Array, tlv: Tlv): string | undefined {
 
 function bytesToAscii(bytes: Uint8Array): string {
   let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i])
+  for (const b of bytes) s += String.fromCodePoint(b)
   return s
 }
 

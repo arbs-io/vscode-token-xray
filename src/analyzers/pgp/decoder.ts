@@ -173,7 +173,7 @@ function base64ToBytes(body: string): Uint8Array | undefined {
   try {
     const binary = atob(body)
     const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0
     return bytes
   } catch {
     return undefined

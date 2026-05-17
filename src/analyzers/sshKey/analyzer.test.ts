@@ -25,7 +25,7 @@ function lenPrefixed(bytes: Uint8Array): Uint8Array {
 
 function ascii(s: string): Uint8Array {
   const out = new Uint8Array(s.length)
-  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i)
+  for (let i = 0; i < s.length; i++) out[i] = s.codePointAt(i) ?? 0
   return out
 }
 
@@ -43,7 +43,7 @@ function concat(...parts: Uint8Array[]): Uint8Array {
 
 function bytesToBase64(bytes: Uint8Array): string {
   let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i])
+  for (const b of bytes) s += String.fromCodePoint(b)
   return btoa(s)
 }
 

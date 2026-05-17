@@ -184,7 +184,7 @@ function base64ToBytes(body: string): Uint8Array | undefined {
   try {
     const binary = atob(body)
     const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0
     return bytes
   } catch {
     return undefined
@@ -193,7 +193,7 @@ function base64ToBytes(body: string): Uint8Array | undefined {
 
 function bytesToAscii(bytes: Uint8Array): string {
   let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i])
+  for (const b of bytes) s += String.fromCodePoint(b)
   return s
 }
 
