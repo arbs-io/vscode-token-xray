@@ -124,47 +124,47 @@ const SEVERITY_RANK: Record<Severity, number> = {
  * The function never throws and never reads from anything but the
  * provided findings list. No vscode imports.
  */
-export function buildTree(findings: readonly WorkspaceFinding[] | undefined | null): TreeNodeDto[] {
-  if (!findings || findings.length === 0) return []
+function countSeverities(bucket: readonly WorkspaceFinding[]): { errorCount: number; warningCount: number; infoCount: number } {
+  let errorCount = 0
+  let warningCount = 0
+  let infoCount = 0
+  for (const entry of bucket) {
+    if (entry.finding.severity === 'error') errorCount++
+    else if (entry.finding.severity === 'warning') warningCount++
+    else infoCount++
+  }
+  return { errorCount, warningCount, infoCount }
+}
 
+function groupByAnalyzer(findings: readonly WorkspaceFinding[]): Map<string, WorkspaceFinding[]> {
   const groups = new Map<string, WorkspaceFinding[]>()
   for (const entry of findings) {
     if (!entry?.finding) continue
-    const key = entry.analyzerId
-    let bucket = groups.get(key)
-    if (!bucket) {
-      bucket = []
-      groups.set(key, bucket)
-    }
+    const bucket = groups.get(entry.analyzerId) ?? []
+    if (bucket.length === 0) groups.set(entry.analyzerId, bucket)
     bucket.push(entry)
   }
+  return groups
+}
 
+export function buildTree(findings: readonly WorkspaceFinding[] | undefined | null): TreeNodeDto[] {
+  if (!findings || findings.length === 0) return []
+
+  const groups = groupByAnalyzer(findings)
   const roots: TreeNodeDto[] = []
   for (const [analyzerId, bucket] of groups) {
     if (bucket.length === 0) continue
     const analyzerName = bucket[0].analyzerName
-
     const sorted = bucket.slice().sort(compareByLocation)
     const children: TreeNodeDto[] = sorted.map((entry, index) => buildFindingNode(entry, analyzerId, index))
-
-    let errorCount = 0
-    let warningCount = 0
-    let infoCount = 0
-    for (const entry of bucket) {
-      if (entry.finding.severity === 'error') errorCount++
-      else if (entry.finding.severity === 'warning') warningCount++
-      else infoCount++
-    }
-
+    const counts = countSeverities(bucket)
     roots.push({
       id: `analyzer:${analyzerId}`,
       kind: 'analyzerRoot',
       label: `${analyzerName} (${bucket.length})`,
       analyzerId,
       analyzerName,
-      errorCount,
-      warningCount,
-      infoCount,
+      ...counts,
       children,
     })
   }
