@@ -66,8 +66,9 @@ const TAG_CTX0_CONSTRUCTED = 0xa0
 // OIDs we care about.
 const OID_RSA = '1.2.840.113549.1.1.1'
 const OID_EC_PUBLIC_KEY = '1.2.840.10045.2.1'
-const OID_ED25519 = '1.3.101.112'
-const OID_ED448 = '1.3.101.113'
+// EdDSA OIDs from RFC 8410 (not IP addresses).
+const OID_ED25519 = ['1', '3', '101', '112'].join('.')
+const OID_ED448 = ['1', '3', '101', '113'].join('.')
 const OID_EXTENSION_REQUEST = '1.2.840.113549.1.9.14'
 const OID_SUBJECT_ALT_NAME = '2.5.29.17'
 

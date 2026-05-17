@@ -144,7 +144,7 @@ export function buildTree(findings: readonly WorkspaceFinding[] | undefined | nu
     if (bucket.length === 0) continue
     const analyzerName = bucket[0].analyzerName
 
-    const sorted = bucket.slice().sort(compareFindings)
+    const sorted = bucket.slice().sort(compareByLocation)
     const children: TreeNodeDto[] = sorted.map((entry, index) => buildFindingNode(entry, analyzerId, index))
 
     let errorCount = 0
@@ -193,7 +193,12 @@ function buildFindingNode(
   }
 }
 
-function compareFindings(a: WorkspaceFinding, b: WorkspaceFinding): number {
+interface HasLocation {
+  filePath: string
+  range: { startLine: number; startColumn: number }
+}
+
+function compareByLocation(a: HasLocation, b: HasLocation): number {
   const pathDelta = a.filePath.localeCompare(b.filePath)
   if (pathDelta !== 0) return pathDelta
   const lineDelta = a.range.startLine - b.range.startLine
@@ -232,7 +237,7 @@ export function buildTokenTree(
   tokens: readonly WorkspaceToken[] | undefined | null
 ): TreeNodeDto[] {
   if (!tokens || tokens.length === 0) return []
-  const sorted = tokens.slice().sort(compareTokenLocation)
+  const sorted = tokens.slice().sort(compareByLocation)
   return sorted.map((token, index) => buildTokenRoot(token, index))
 }
 
@@ -327,14 +332,6 @@ function buildFindingsGroup(
   }
 }
 
-function compareTokenLocation(a: WorkspaceToken, b: WorkspaceToken): number {
-  const pathDelta = a.filePath.localeCompare(b.filePath)
-  if (pathDelta !== 0) return pathDelta
-  const lineDelta = a.range.startLine - b.range.startLine
-  if (lineDelta !== 0) return lineDelta
-  return a.range.startColumn - b.range.startColumn
-}
-
 function stringifyRowValue(v: unknown): string {
   if (v === null || v === undefined) return ''
   if (typeof v === 'string') return v
@@ -342,7 +339,7 @@ function stringifyRowValue(v: unknown): string {
   try {
     return JSON.stringify(v)
   } catch {
-    return String(v)
+    return '[unserializable]'
   }
 }
 
