@@ -1,10 +1,20 @@
 # Token X-Ray
 
+> [!NOTE]
 > X-ray vision for tokens and secrets — locally inspect JWTs, SAML assertions, X.509 certificates, JWKs, OAuth / PASETO / Basic / AWS SigV4 tokens, OpenSSH and PGP material, OIDC discovery documents, HTTP signatures, cookies, and detect credentials in any source file. Runs entirely locally; no data leaves your machine.
 
-![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/AndrewButson.vscode-token-xray)
-![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/AndrewButson.vscode-token-xray)
-![Visual Studio Marketplace Rating](https://img.shields.io/visual-studio-marketplace/r/AndrewButson.vscode-token-xray)
+![Visual Studio Marketplace Version](https://vsmarketplacebadges.dev/version-short/AndrewButson.vscode-token-xray.svg)
+![Visual Studio Marketplace Installs](https://vsmarketplacebadges.dev/installs-short/AndrewButson.vscode-token-xray.svg)
+![Visual Studio Marketplace Trending](https://vsmarketplacebadges.dev/trending-weekly/AndrewButson.vscode-token-xray.svg)
+![Visual Studio Marketplace Rating](https://vsmarketplacebadges.dev/rating-star/AndrewButson.vscode-token-xray.svg)
+[![GitHub issues](https://img.shields.io/github/issues/arbs-io/vscode-token-xray.svg)](https://github.com/arbs-io/vscode-token-xray/issues)
+
+![.github/workflows/codeql-analysis](https://github.com/arbs-io/vscode-token-xray/actions/workflows/codeql-analysis.yml/badge.svg)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=arbs-io_vscode-token-xray&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=arbs-io_vscode-token-xray)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=arbs-io_vscode-token-xray&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=arbs-io_vscode-token-xray)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=arbs-io_vscode-token-xray&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=arbs-io_vscode-token-xray)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=arbs-io_vscode-token-xray&metric=bugs)](https://sonarcloud.io/summary/new_code?id=arbs-io_vscode-token-xray)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=arbs-io_vscode-token-xray&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=arbs-io_vscode-token-xray)
 
 ## What it inspects
 
