@@ -22,8 +22,8 @@ import {
   TreeNodeDto,
   WorkspaceToken,
 } from '../core/findingsTree'
-import { scanDocument } from '../core/scanDocument'
-import { Match, Severity } from '../core/types'
+import { ScanCache } from '../core/scanCache'
+import { Severity } from '../core/types'
 import { effectiveTabUri, openTabUriStrings } from '../utils/openTabs'
 
 const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell'])
@@ -62,6 +62,14 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
   private readonly _onDidChange = new EventEmitter<TreeNodeDto | undefined | void>()
   readonly onDidChangeTreeData: Event<TreeNodeDto | undefined | void> = this._onDidChange.event
   private cachedRoots: TreeNodeDto[] = []
+  private readonly scanCache: ScanCache
+
+  constructor(scanCache?: ScanCache) {
+    // Default to a private cache when none is supplied so direct callers
+    // (notably tests) work without DI. In production `extension.ts`
+    // hands in the shared instance the diagnostics provider also uses.
+    this.scanCache = scanCache ?? new ScanCache()
+  }
 
   refresh(): void {
     this.cachedRoots = buildTokenTree(this.collectTokens())
@@ -110,45 +118,26 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
   }
 
   private scanDocumentTokens(doc: TextDocument): WorkspaceToken[] {
-    let hits: ReturnType<typeof scanDocument>
-    try {
-      hits = scanDocument(doc.getText(), this.registry)
-    } catch {
-      return []
-    }
-    const out: WorkspaceToken[] = []
+    // The cache owns the scanDocument + per-match analyze pipeline.
+    // We just attach the workspace-relative `filePath` on the way out
+    // — the cache is path-agnostic so workspace-folder changes don't
+    // force re-analysis.
+    const cached = this.scanCache.getTokens({
+      uriKey: doc.uri.toString(),
+      version: doc.version,
+      text: doc.getText(),
+      registry: this.registry,
+    })
     const filePath = this.workspaceRelativePath(doc.uri)
-    for (const hit of hits) {
-      const analyzer = this.registry.get(hit.analyzerId)
-      if (!analyzer) continue
-      const match: Match = {
-        text: hit.text,
-        range: { start: hit.startOffset, end: hit.endOffset },
-      }
-      try {
-        const result = analyzer.analyze(match)
-        // `analyze` may be sync or return a Promise; we ignore async results to
-        // keep refresh() synchronous. All shipped analyzers are sync.
-        if (result instanceof Promise) continue
-        out.push({
-          filePath,
-          analyzerId: hit.analyzerId,
-          analyzerName: hit.analyzerName,
-          kind: result.kind ?? '',
-          range: {
-            startLine: hit.startLine,
-            startColumn: hit.startColumn,
-            endLine: hit.endLine,
-            endColumn: hit.endColumn,
-          },
-          sections: result.sections ?? [],
-          findings: result.findings ?? [],
-        })
-      } catch {
-        // skip on analyze failure
-      }
-    }
-    return out
+    return cached.map((t) => ({
+      filePath,
+      analyzerId: t.analyzerId,
+      analyzerName: t.analyzerName,
+      kind: t.kind,
+      range: t.range,
+      sections: t.sections,
+      findings: t.findings,
+    }))
   }
 
   private workspaceRelativePath(uri: Uri): string {
@@ -232,8 +221,11 @@ export function rangeFromVscodeRange(r: Range): FindingTreeRange {
 
 const REFRESH_DEBOUNCE_MS = 50
 
-export function registerFindingsTreeViewProvider(context: ExtensionContext): void {
-  const provider = new FindingsTreeViewProvider()
+export function registerFindingsTreeViewProvider(
+  context: ExtensionContext,
+  scanCache?: ScanCache
+): void {
+  const provider = new FindingsTreeViewProvider(scanCache)
   provider.refresh()
   const treeView = window.createTreeView('tokenXray.findings', {
     treeDataProvider: provider,
