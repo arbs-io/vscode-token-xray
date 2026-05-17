@@ -24,6 +24,7 @@ import {
 } from '../core/findingsTree'
 import { scanDocument } from '../core/scanDocument'
 import { Match, Severity } from '../core/types'
+import { effectiveTabUri, openTabUriStrings } from '../utils/openTabs'
 
 const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell'])
 
@@ -94,9 +95,15 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
   }
 
   private collectTokens(): WorkspaceToken[] {
+    // `workspace.textDocuments` can hold "ghost" documents whose tabs were
+    // closed (VS Code is allowed to keep the TextDocument alive after the
+    // tab disappears), so we cross-reference against the live tab list to
+    // drop their tokens from the tree.
+    const openTabs = openTabUriStrings()
     const tokens: WorkspaceToken[] = []
     for (const doc of workspace.textDocuments) {
       if (!SUPPORTED_SCHEMES.has(doc.uri.scheme)) continue
+      if (!openTabs.has(effectiveTabUri(doc.uri).toString())) continue
       tokens.push(...this.scanDocumentTokens(doc))
     }
     return tokens
@@ -223,6 +230,8 @@ export function rangeFromVscodeRange(r: Range): FindingTreeRange {
   }
 }
 
+const REFRESH_DEBOUNCE_MS = 50
+
 export function registerFindingsTreeViewProvider(context: ExtensionContext): void {
   const provider = new FindingsTreeViewProvider()
   provider.refresh()
@@ -230,14 +239,41 @@ export function registerFindingsTreeViewProvider(context: ExtensionContext): voi
     treeDataProvider: provider,
     showCollapseAll: true,
   })
-  // Re-scan on document open/change/close and on diagnostic refreshes (which
-  // happen after the secret scanner runs — useful for keeping the tree in sync
-  // when nothing else fires a text-document event).
+
+  // Coalesce rapid events (a keystroke fires onDidChangeTextDocument
+  // plus a follow-up onDidChangeDiagnostics) into a single rebuild on
+  // the trailing edge. 50ms is short enough to feel instant and long
+  // enough to absorb a burst of paired events.
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined
+  const scheduleRefresh = () => {
+    if (refreshTimer) clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined
+      provider.refresh()
+    }, REFRESH_DEBOUNCE_MS)
+  }
+
+  // Re-scan on document open/change/close, on diagnostic refreshes (which
+  // happen after the secret scanner runs), and on tab open/close. The tab
+  // listener catches "user closed the tab but VS Code kept the doc in
+  // memory" — `onDidCloseTextDocument` is not guaranteed to fire in that
+  // case (see the API docs note). `event.changed` is intentionally ignored
+  // because it covers active-state / dirty-state flips that don't affect
+  // which tokens the tree should show.
   context.subscriptions.push(
     treeView,
-    workspace.onDidOpenTextDocument(() => provider.refresh()),
-    workspace.onDidCloseTextDocument(() => provider.refresh()),
-    workspace.onDidChangeTextDocument(() => provider.refresh()),
-    languages.onDidChangeDiagnostics(() => provider.refresh())
+    workspace.onDidOpenTextDocument(scheduleRefresh),
+    workspace.onDidCloseTextDocument(scheduleRefresh),
+    workspace.onDidChangeTextDocument(scheduleRefresh),
+    languages.onDidChangeDiagnostics(scheduleRefresh),
+    window.tabGroups.onDidChangeTabs((event) => {
+      if (event.opened.length === 0 && event.closed.length === 0) return
+      scheduleRefresh()
+    }),
+    {
+      dispose: () => {
+        if (refreshTimer) clearTimeout(refreshTimer)
+      },
+    }
   )
 }
