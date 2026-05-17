@@ -11,8 +11,8 @@ function b64u(json: object): string {
   return Buffer.from(JSON.stringify(json))
     .toString('base64')
     .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
 }
 
 const NOW = Date.UTC(2026, 0, 1)
@@ -95,8 +95,8 @@ describe('augmentWithVerification', () => {
     const jwe = `${Buffer.from(JSON.stringify({ alg: 'RSA-OAEP', enc: 'A256GCM' }))
       .toString('base64')
       .replace(/=+$/, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')}.k.iv.ct.tag`
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')}.k.iv.ct.tag`
     const payload = buildJwtPanelPayload(jwe)
     const keys: VerifyKeySource[] = [{ kind: 'symmetric', secret: SECRET, alg: 'HS256' }]
     const augmented = await augmentWithVerification(payload, jwe, keys)

@@ -7,8 +7,8 @@ function b64u(json: object): string {
   return Buffer.from(JSON.stringify(json))
     .toString('base64')
     .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
 }
 
 describe('findingToDiagnostic', () => {

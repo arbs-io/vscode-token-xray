@@ -11,8 +11,8 @@ describe('base64UrlDecode', () => {
     const encoded = Buffer.from(text, 'utf8')
       .toString('base64')
       .replace(/=+$/, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
     expect(base64UrlDecode(encoded)).toBe(text)
   })
 

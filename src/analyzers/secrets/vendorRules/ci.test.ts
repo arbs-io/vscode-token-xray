@@ -212,7 +212,7 @@ describe('CI_SECRET_RULES — Codecov upload token (labelled)', () => {
 
   it('rejects malformed UUID (missing hyphen segments)', () => {
     expect(
-      scanForSecrets(`CODECOV_TOKEN=${CODECOV_UUID.replace(/-/g, '')}`, opts).some(
+      scanForSecrets(`CODECOV_TOKEN=${CODECOV_UUID.replaceAll('-', '')}`, opts).some(
         (h) => h.rule.id === 'secret.codecov.uploadTokenLabelled'
       )
     ).toBe(false)

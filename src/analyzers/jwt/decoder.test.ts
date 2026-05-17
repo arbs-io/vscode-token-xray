@@ -5,8 +5,8 @@ function b64u(json: object): string {
   return Buffer.from(JSON.stringify(json))
     .toString('base64')
     .replace(/=+$/, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
 }
 
 function jws(header: object, payload: object, sig = 'sig'): string {

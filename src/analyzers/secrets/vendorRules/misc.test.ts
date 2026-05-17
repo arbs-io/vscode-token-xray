@@ -282,7 +282,7 @@ describe('MISC_SECRET_RULES — Snyk token (labelled)', () => {
 
   it('rejects malformed UUID (missing hyphen segments)', () => {
     expect(
-      scanForSecrets(`SNYK_TOKEN=${SNYK_UUID.replace(/-/g, '')}`, opts).some(
+      scanForSecrets(`SNYK_TOKEN=${SNYK_UUID.replaceAll('-', '')}`, opts).some(
         (h) => h.rule.id === 'secret.snyk.tokenLabelled'
       )
     ).toBe(false)
@@ -350,7 +350,7 @@ describe('MISC_SECRET_RULES — Heroku API key (labelled)', () => {
 
   it('rejects malformed UUID (missing hyphen segments)', () => {
     expect(
-      scanForSecrets(`HEROKU_API_KEY=${HEROKU_UUID.replace(/-/g, '')}`, opts).some(
+      scanForSecrets(`HEROKU_API_KEY=${HEROKU_UUID.replaceAll('-', '')}`, opts).some(
         (h) => h.rule.id === 'secret.heroku.apiKeyLabelled'
       )
     ).toBe(false)
