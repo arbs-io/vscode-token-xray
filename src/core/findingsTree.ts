@@ -1,4 +1,4 @@
-import { Finding, Severity } from './types'
+import { Finding, Section, Severity } from './types'
 
 /**
  * Zero-based line/column coordinates of a finding within its source file.
@@ -26,11 +26,36 @@ export interface WorkspaceFinding {
 }
 
 /**
- * Discriminator for the two node kinds in the tree. Roots represent an
- * analyzer with one or more findings, children represent the individual
- * findings underneath that analyzer.
+ * One detected token with its full analysis. Used by `buildTokenTree`
+ * to produce the richer per-token outline the activity-bar view renders.
+ *
+ * The fields mirror `AnalysisResult` (sections + findings) plus the
+ * file location and analyzer identity needed by the provider adapter.
  */
-export type TreeNodeKind = 'analyzerRoot' | 'finding'
+export interface WorkspaceToken {
+  filePath: string
+  analyzerId: string
+  analyzerName: string
+  /** `AnalysisResult.kind` — short kind label like "JWS", "JWE", "cert (DER)". */
+  kind: string
+  range: FindingTreeRange
+  sections: Section[]
+  findings: Finding[]
+}
+
+/**
+ * Discriminator for tree node kinds. The legacy `analyzerRoot` + `finding`
+ * pair is kept for back-compat with `buildTree`; the token-rooted builder
+ * emits the richer `tokenRoot` / `sectionGroup` / `sectionRow` /
+ * `findingsGroup` set.
+ */
+export type TreeNodeKind =
+  | 'analyzerRoot'
+  | 'finding'
+  | 'tokenRoot'
+  | 'sectionGroup'
+  | 'sectionRow'
+  | 'findingsGroup'
 
 /**
  * Plain-data tree node emitted by the pure builder. The vscode-aware
@@ -68,6 +93,14 @@ export interface TreeNodeDto {
   findingId?: string
   /** Populated only for `finding` nodes. */
   message?: string
+  /** Populated only for `sectionRow` nodes. */
+  rowKey?: string
+  /** Populated only for `sectionRow` nodes. */
+  rowValue?: string
+  /** Populated only for `sectionRow` nodes — surfaces hover tooltip text. */
+  rowDescription?: string
+  /** Optional `vscode.TreeItem.description` text — shown next to the label. */
+  description?: string
 }
 
 /**
@@ -180,3 +213,139 @@ function compareAnalyzerRoots(a: TreeNodeDto, b: TreeNodeDto): number {
 
 /** Re-export the severity rank table for tests that want to assert on it. */
 export const SEVERITY_RANK_TABLE: Readonly<Record<Severity, number>> = SEVERITY_RANK
+
+/**
+ * Token-centric tree builder. Emits one root per detected token, with the
+ * analyzer's sections + findings as nested children:
+ *
+ *   tokenRoot — e.g. "JWT (JWS)" + description "sample.jwt:1"
+ *     sectionGroup — e.g. "Header"
+ *       sectionRow — "alg: HS256"
+ *     sectionGroup — "Claims"
+ *       sectionRow — "iss: …"
+ *     findingsGroup — "Findings (N)" (omitted when there are no findings)
+ *       finding — "[error] jwt.alg.none — …"
+ *
+ * Tokens are sorted by file path then start line. Pure — no vscode refs.
+ */
+export function buildTokenTree(
+  tokens: readonly WorkspaceToken[] | undefined | null
+): TreeNodeDto[] {
+  if (!tokens || tokens.length === 0) return []
+  const sorted = tokens.slice().sort(compareTokenLocation)
+  return sorted.map((token, index) => buildTokenRoot(token, index))
+}
+
+function buildTokenRoot(token: WorkspaceToken, index: number): TreeNodeDto {
+  const id = `token:${index}`
+  let errorCount = 0
+  let warningCount = 0
+  let infoCount = 0
+  for (const f of token.findings) {
+    if (f.severity === 'error') errorCount++
+    else if (f.severity === 'warning') warningCount++
+    else infoCount++
+  }
+
+  const children: TreeNodeDto[] = []
+  token.sections.forEach((section, sIdx) => {
+    children.push(buildSectionGroup(section, id, sIdx))
+  })
+  if (token.findings.length > 0) {
+    children.push(buildFindingsGroup(token.findings, id, token.filePath, token.range))
+  }
+
+  const kindSuffix = token.kind ? ` (${token.kind})` : ''
+  return {
+    id,
+    kind: 'tokenRoot',
+    label: `${token.analyzerName}${kindSuffix}`,
+    description: `${token.filePath}:${token.range.startLine + 1}`,
+    analyzerId: token.analyzerId,
+    analyzerName: token.analyzerName,
+    errorCount,
+    warningCount,
+    infoCount,
+    children,
+    filePath: token.filePath,
+    range: { ...token.range },
+  }
+}
+
+function buildSectionGroup(section: Section, parentId: string, sIdx: number): TreeNodeDto {
+  const id = `${parentId}:section:${sIdx}`
+  const rows = section.rows.map((row, rIdx) => buildSectionRow(row, id, rIdx))
+  return {
+    id,
+    kind: 'sectionGroup',
+    label: section.title,
+    children: rows,
+  }
+}
+
+function buildSectionRow(
+  row: { key: string; value: unknown; description?: string },
+  parentId: string,
+  rIdx: number
+): TreeNodeDto {
+  const valueStr = stringifyRowValue(row.value)
+  return {
+    id: `${parentId}:row:${rIdx}`,
+    kind: 'sectionRow',
+    label: row.key,
+    description: truncate(valueStr, 120),
+    rowKey: row.key,
+    rowValue: valueStr,
+    rowDescription: row.description,
+    children: [],
+  }
+}
+
+function buildFindingsGroup(
+  findings: readonly Finding[],
+  parentId: string,
+  filePath: string,
+  range: FindingTreeRange
+): TreeNodeDto {
+  const id = `${parentId}:findings`
+  const children = findings.map((f, fIdx) => ({
+    id: `${id}:${fIdx}`,
+    kind: 'finding' as const,
+    label: `[${f.severity}] ${f.message}`,
+    children: [],
+    severity: f.severity,
+    findingId: f.id,
+    message: f.message,
+    filePath,
+    range: { ...range },
+  }))
+  return {
+    id,
+    kind: 'findingsGroup',
+    label: `Findings (${findings.length})`,
+    children,
+  }
+}
+
+function compareTokenLocation(a: WorkspaceToken, b: WorkspaceToken): number {
+  const pathDelta = a.filePath.localeCompare(b.filePath)
+  if (pathDelta !== 0) return pathDelta
+  const lineDelta = a.range.startLine - b.range.startLine
+  if (lineDelta !== 0) return lineDelta
+  return a.range.startColumn - b.range.startColumn
+}
+
+function stringifyRowValue(v: unknown): string {
+  if (v === null || v === undefined) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') return String(v)
+  try {
+    return JSON.stringify(v)
+  } catch {
+    return String(v)
+  }
+}
+
+function truncate(s: string, n: number): string {
+  return s.length > n ? `${s.slice(0, n - 1)}…` : s
+}

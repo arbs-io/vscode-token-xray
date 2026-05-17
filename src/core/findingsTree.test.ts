@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildTokenTree,
   buildTree,
   FindingTreeRange,
   SEVERITY_RANK_TABLE,
   TreeNodeDto,
   WorkspaceFinding,
+  WorkspaceToken,
 } from './findingsTree'
-import { Finding, Severity } from './types'
+import { Finding, Section, Severity } from './types'
 
 function range(startLine: number, startColumn = 0, endColumn = startColumn + 10): FindingTreeRange {
   return { startLine, startColumn, endLine: startLine, endColumn }
@@ -494,6 +496,167 @@ describe('buildTree', () => {
         expect(typeof SEVERITY_RANK_TABLE[sev]).toBe('number')
       }
     })
+  })
+})
+
+function token(overrides: Partial<WorkspaceToken> & { filePath: string }): WorkspaceToken {
+  return {
+    analyzerId: 'jwt',
+    analyzerName: 'JWT',
+    kind: 'JWS',
+    range: range(0),
+    sections: [],
+    findings: [],
+    ...overrides,
+  }
+}
+
+function section(title: string, rows: Section['rows']): Section {
+  return { id: title.toLowerCase(), title, rows }
+}
+
+describe('buildTokenTree', () => {
+  it('returns [] for null / empty input', () => {
+    expect(buildTokenTree(null)).toEqual([])
+    expect(buildTokenTree(undefined)).toEqual([])
+    expect(buildTokenTree([])).toEqual([])
+  })
+
+  it('emits one tokenRoot per token with kind suffix and file:line description', () => {
+    const tokens: WorkspaceToken[] = [
+      token({
+        filePath: 'a.jwt',
+        kind: 'JWS',
+        range: range(0),
+        sections: [section('Header', [{ key: 'alg', value: 'HS256' }])],
+        findings: [],
+      }),
+    ]
+    const roots = buildTokenTree(tokens)
+    expect(roots).toHaveLength(1)
+    expect(roots[0].kind).toBe('tokenRoot')
+    expect(roots[0].label).toBe('JWT (JWS)')
+    expect(roots[0].description).toBe('a.jwt:1')
+    expect(roots[0].filePath).toBe('a.jwt')
+  })
+
+  it('nests sections as sectionGroup → sectionRow leaves', () => {
+    const tokens = [
+      token({
+        filePath: 'x.jwt',
+        sections: [
+          section('Header', [
+            { key: 'alg', value: 'HS256' },
+            { key: 'typ', value: 'JWT' },
+          ]),
+          section('Claims', [{ key: 'sub', value: 'alice@example.com' }]),
+        ],
+      }),
+    ]
+    const [root] = buildTokenTree(tokens)
+    expect(root.children).toHaveLength(2)
+    expect(root.children[0].kind).toBe('sectionGroup')
+    expect(root.children[0].label).toBe('Header')
+    expect(root.children[0].children).toHaveLength(2)
+    expect(root.children[0].children[0].kind).toBe('sectionRow')
+    expect(root.children[0].children[0].label).toBe('alg')
+    expect(root.children[0].children[0].description).toBe('HS256')
+    expect(root.children[0].children[0].rowKey).toBe('alg')
+    expect(root.children[0].children[0].rowValue).toBe('HS256')
+    expect(root.children[1].label).toBe('Claims')
+  })
+
+  it('appends a findingsGroup with one finding leaf per finding', () => {
+    const findings: Finding[] = [
+      { id: 'jwt.alg.none', severity: 'error', message: 'alg=none not allowed' },
+      { id: 'jwt.exp.soon', severity: 'warning', message: 'expires in 2 days' },
+      { id: 'jwt.idp.entraV2', severity: 'info', message: 'Microsoft Entra ID v2' },
+    ]
+    const tokens = [token({ filePath: 't.jwt', findings })]
+    const [root] = buildTokenTree(tokens)
+    expect(root.errorCount).toBe(1)
+    expect(root.warningCount).toBe(1)
+    expect(root.infoCount).toBe(1)
+    const group = root.children.find((c) => c.kind === 'findingsGroup')
+    expect(group).toBeDefined()
+    expect(group!.label).toBe('Findings (3)')
+    expect(group!.children).toHaveLength(3)
+    expect(group!.children[0].kind).toBe('finding')
+    expect(group!.children[0].label).toBe('[error] alg=none not allowed')
+    expect(group!.children[0].severity).toBe('error')
+    expect(group!.children[0].findingId).toBe('jwt.alg.none')
+    expect(group!.children[0].filePath).toBe('t.jwt')
+  })
+
+  it('omits the findingsGroup when there are no findings', () => {
+    const tokens = [token({ filePath: 'clean.jwt', findings: [] })]
+    const [root] = buildTokenTree(tokens)
+    expect(root.children.find((c) => c.kind === 'findingsGroup')).toBeUndefined()
+  })
+
+  it('sorts tokens by file path then start line', () => {
+    const tokens: WorkspaceToken[] = [
+      token({ filePath: 'b.jwt', range: range(0) }),
+      token({ filePath: 'a.jwt', range: range(5) }),
+      token({ filePath: 'a.jwt', range: range(0) }),
+    ]
+    const roots = buildTokenTree(tokens)
+    expect(roots.map((r) => r.description)).toEqual(['a.jwt:1', 'a.jwt:6', 'b.jwt:1'])
+  })
+
+  it('stringifies row values safely (null / object / number / boolean)', () => {
+    const tokens = [
+      token({
+        filePath: 'mix.jwt',
+        sections: [
+          section('mix', [
+            { key: 'null', value: null },
+            { key: 'obj', value: { a: 1 } },
+            { key: 'num', value: 42 },
+            { key: 'bool', value: true },
+            { key: 'undef', value: undefined },
+          ]),
+        ],
+      }),
+    ]
+    const [root] = buildTokenTree(tokens)
+    const rows = root.children[0].children
+    expect(rows[0].description).toBe('')
+    expect(rows[1].description).toBe('{"a":1}')
+    expect(rows[2].description).toBe('42')
+    expect(rows[3].description).toBe('true')
+    expect(rows[4].description).toBe('')
+  })
+
+  it('truncates long row values', () => {
+    const longString = 'x'.repeat(200)
+    const tokens = [
+      token({
+        filePath: 'long.jwt',
+        sections: [section('long', [{ key: 'k', value: longString }])],
+      }),
+    ]
+    const [root] = buildTokenTree(tokens)
+    const desc = root.children[0].children[0].description ?? ''
+    expect(desc.length).toBeLessThanOrEqual(120)
+    expect(desc.endsWith('…')).toBe(true)
+  })
+
+  it('forwards section row description into rowDescription', () => {
+    const tokens = [
+      token({
+        filePath: 'desc.jwt',
+        sections: [section('s', [{ key: 'k', value: 'v', description: 'helpful text' }])],
+      }),
+    ]
+    const [root] = buildTokenTree(tokens)
+    expect(root.children[0].children[0].rowDescription).toBe('helpful text')
+  })
+
+  it('omits kind suffix when the analyzer did not provide one', () => {
+    const tokens = [token({ filePath: 'k.jwt', kind: '' })]
+    const [root] = buildTokenTree(tokens)
+    expect(root.label).toBe('JWT')
   })
 })
 
