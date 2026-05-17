@@ -68,6 +68,14 @@ export interface ScanTextSettings {
    * `DiagnosticsMetrics` — no new counters are introduced.
    */
   onMetrics?: (metrics: ScanTextMetrics) => void
+  /**
+   * Cooperative cancellation. Forwarded to `diagnosticsAcrossRegistry`
+   * so a newer scan can pre-empt an in-flight one mid-registry-walk.
+   * On abort the function returns `[]` and emits zero metrics; callers
+   * that wrap this for vscode diagnostics drop the result via the
+   * existing per-URI scan-token guard.
+   */
+  signal?: AbortSignal
 }
 
 export const DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES = 1_048_576 // 1 MiB
@@ -131,6 +139,7 @@ export async function scanText(
     ruleSeverity: settings.ruleSeverity,
     onSuppression: settings.onSuppression,
     onMetrics: captureRegMetrics,
+    signal: settings.signal,
   })
   if (all.length === 0) {
     emitMetrics(0, 0)

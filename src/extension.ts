@@ -1,4 +1,4 @@
-import { ExtensionContext, workspace } from 'vscode'
+import { commands, ExtensionContext, window, workspace } from 'vscode'
 import { keySourcesFromConfigDetailed } from './analyzers/jwt/keyLoader'
 import { registerInspectCommand } from './contexts/registerInspectCommand'
 import { registerShowClaimsetPreviewCommand } from './contexts/registerShowClaimsetPreviewCommand'
@@ -55,22 +55,42 @@ export function activate(context: ExtensionContext) {
   registerShowClaimsetPreviewCommand(context)
   registerShowJsonPreviewCommand(context)
 
-  // Validate `tokenXray.jwt.keys` and surface any malformed entries through
-  // the debug output channel. Without this the user has no signal when
-  // settings.json contains a typo (entries are silently dropped at
-  // verification time). We re-check whenever the user edits the setting so
-  // feedback is immediate.
-  const reportKeyConfigIssues = () => {
+  // Validate `tokenXray.jwt.keys` and surface any malformed entries.
+  // Every issue is logged to the debug channel (machine-parseable trace
+  // for power users); the FIRST issue seen per-config-revision also
+  // raises a one-shot `showWarningMessage` so users who haven't
+  // discovered the debug channel still get a visible signal that their
+  // settings.json change didn't take effect. We dedupe by (index +
+  // reason) tuple so editing one bad entry doesn't re-toast on every
+  // keystroke.
+  const seenIssues = new Set<string>()
+  const reportKeyConfigIssues = async () => {
     const config = workspace.getConfiguration('tokenXray.jwt')
     const { issues } = keySourcesFromConfigDetailed(config.get<unknown[]>('keys', []))
+    if (issues.length === 0) {
+      seenIssues.clear()
+      return
+    }
     for (const issue of issues) {
       debugLog(`tokenXray.jwt.keys[${issue.index}] ignored: ${issue.reason}`)
     }
+    const firstUnseen = issues.find(
+      (i) => !seenIssues.has(`${i.index}:${i.reason}`)
+    )
+    if (!firstUnseen) return
+    for (const i of issues) seenIssues.add(`${i.index}:${i.reason}`)
+    const action = await window.showWarningMessage(
+      `Token X-Ray: tokenXray.jwt.keys[${firstUnseen.index}] ignored — ${firstUnseen.reason}`,
+      'Open Settings'
+    )
+    if (action === 'Open Settings') {
+      void commands.executeCommand('workbench.action.openSettings', 'tokenXray.jwt.keys')
+    }
   }
-  reportKeyConfigIssues()
+  void reportKeyConfigIssues()
   context.subscriptions.push(
     workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('tokenXray.jwt.keys')) reportKeyConfigIssues()
+      if (e.affectsConfiguration('tokenXray.jwt.keys')) void reportKeyConfigIssues()
     })
   )
 }

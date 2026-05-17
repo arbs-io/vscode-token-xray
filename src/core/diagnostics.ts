@@ -97,6 +97,14 @@ export interface DiagnosticsAcrossRegistryOptions {
    * the regular control flow.
    */
   onMetrics?: (metrics: DiagnosticsMetrics) => void
+  /**
+   * Cooperative cancellation. Checked between analyzer steps inside
+   * `collectPending`; when `aborted` becomes true the function returns
+   * an empty array (and the caller emits zero-metrics). Use this when a
+   * newer scan supersedes the in-flight one — saves CPU on the rest of
+   * the registry walk instead of always running to completion.
+   */
+  signal?: AbortSignal
 }
 
 type Pending = { finding: Finding; analyzerId: string; range: DiagnosticRangeDto }
@@ -105,13 +113,16 @@ type TaggedFinding = Finding & { __idx: number }
 async function collectPending(
   text: string,
   registry: AnalyzerRegistry,
-  lineStarts: number[]
+  lineStarts: number[],
+  signal?: AbortSignal
 ): Promise<Pending[]> {
   const pending: Pending[] = []
   for (const analyzer of registry.list()) {
+    if (signal?.aborted) return []
     for (const match of analyzer.detect(text)) {
       try {
         const result = await Promise.resolve(analyzer.analyze(match))
+        if (signal?.aborted) return []
         const range = match.range
           ? rangeForOffsets(match.range.start, match.range.end, lineStarts, text)
           : rangeForLine(0, text.length)
@@ -176,8 +187,16 @@ export async function diagnosticsAcrossRegistry(
     emitMetrics({ scanned: 0, droppedBySeverityOverride: 0, droppedByDisableComments: 0 })
     return []
   }
+  if (options.signal?.aborted) {
+    emitMetrics({ scanned: 0, droppedBySeverityOverride: 0, droppedByDisableComments: 0 })
+    return []
+  }
   const lineStarts = computeLineStarts(text)
-  const pending = await collectPending(text, registry, lineStarts)
+  const pending = await collectPending(text, registry, lineStarts, options.signal)
+  if (options.signal?.aborted) {
+    emitMetrics({ scanned: 0, droppedBySeverityOverride: 0, droppedByDisableComments: 0 })
+    return []
+  }
 
   if (pending.length === 0) {
     emitMetrics({ scanned: 0, droppedBySeverityOverride: 0, droppedByDisableComments: 0 })

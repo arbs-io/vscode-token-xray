@@ -114,11 +114,12 @@ export class JwtClaimsetViewerPanel {
    * CSP policy:
    *   - `default-src 'none'` denies everything not explicitly allowed.
    *   - `script-src 'nonce-<n>'` only the bundled webview script can execute.
-   *   - `style-src ${cspSource} 'unsafe-inline'` — the React tree (App.tsx)
-   *     uses inline `style={}` props heavily; removing 'unsafe-inline'
-   *     would break the panel without a CSS-module refactor. The webview
-   *     itself is local-only and receives no untrusted HTML, so the
-   *     residual XSS surface is the bundled script we ship.
+   *   - `style-src ${cspSource} 'unsafe-inline'` — the `@vscode/webview-ui-toolkit`
+   *     web components inject inline `<style>` blocks for FAST design
+   *     tokens; dropping `'unsafe-inline'` breaks them silently at
+   *     runtime even though the React tree itself no longer uses
+   *     inline styles (all moved to `App.module.css`). Migrating off
+   *     the deprecated toolkit is the path to remove this clause.
    *   - `img-src ${cspSource} data:` — bundled icons + data-URI sparklines
    *     only; the previous `*` wildcard is gone.
    *

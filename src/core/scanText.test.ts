@@ -188,3 +188,30 @@ describe('shouldDropSecrets', () => {
     expect(shouldDropSecrets(huge, 'a.ts', { maxFileSizeBytes: -1 })).toBe(false)
   })
 })
+
+describe('scanText (cancellation)', () => {
+  it('returns an empty array when the signal is already aborted', async () => {
+    const reg = createDefaultRegistry()
+    const controller = new AbortController()
+    controller.abort()
+    const result = await scanText(`token: ${ALG_NONE_JWT}`, 'a.ts', reg, {
+      signal: controller.signal,
+    })
+    expect(result).toEqual([])
+  })
+
+  it('emits zero metrics when aborted before work begins', async () => {
+    const reg = createDefaultRegistry()
+    const controller = new AbortController()
+    controller.abort()
+    let metrics: { published?: number; scanned?: number } | undefined
+    await scanText(`token: ${ALG_NONE_JWT}`, 'a.ts', reg, {
+      signal: controller.signal,
+      onMetrics: (m) => {
+        metrics = m
+      },
+    })
+    expect(metrics?.published).toBe(0)
+    expect(metrics?.scanned).toBe(0)
+  })
+})

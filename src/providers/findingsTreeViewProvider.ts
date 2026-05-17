@@ -27,6 +27,7 @@ import {
 import { ScanCache } from '../core/scanCache'
 import { Severity } from '../core/types'
 import { effectiveTabUri, openTabUriStrings } from '../utils/openTabs'
+import { workspaceRelativeFilename } from '../utils/workspacePath'
 
 const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell'])
 
@@ -192,7 +193,10 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
       text: doc.getText(),
       registry: this.registry,
     })
-    const filePath = this.workspaceRelativePath(doc.uri)
+    // The tree-view label needs a string — fall back to the URI when
+    // the document is untitled / off-workspace (the path util returns
+    // `undefined` in that case).
+    const filePath = workspaceRelativeFilename(doc) ?? doc.uri.toString()
     return cached.map((t) => ({
       filePath,
       analyzerId: t.analyzerId,
@@ -202,22 +206,6 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
       sections: t.sections,
       findings: t.findings,
     }))
-  }
-
-  private workspaceRelativePath(uri: Uri): string {
-    const effective = notebookFileUri(uri) ?? uri
-    if (effective.scheme === 'file') {
-      const folder = workspace.getWorkspaceFolder(effective)
-      if (folder) {
-        const folderPath = folder.uri.fsPath
-        const filePath = effective.fsPath
-        if (filePath.startsWith(folderPath)) {
-          return filePath.slice(folderPath.length).replace(/^[\\/]+/, '')
-        }
-      }
-      return effective.fsPath
-    }
-    return effective.toString()
   }
 
   private collapsibleStateFor(element: TreeNodeDto): TreeItemCollapsibleState {
@@ -335,12 +323,6 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
       arguments: [uri, { selection }],
     }
   }
-}
-
-function notebookFileUri(uri: Uri): Uri | undefined {
-  if (uri.scheme !== 'vscode-notebook-cell') return undefined
-  if (!uri.path) return undefined
-  return uri.with({ scheme: 'file', fragment: '' })
 }
 
 // Keeping this here only because `FindingTreeRange` is the shared shape the
