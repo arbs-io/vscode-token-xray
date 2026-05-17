@@ -35,11 +35,13 @@ export function evaluateJwt(decoded: DecodedJwt, options: JwtFindingOptions = {}
   const payload = decoded.payload
   if (!payload) return findings
 
-  findings.push(...evaluateExp(payload, nowSec))
-  findings.push(...evaluateNbf(payload, nowSec))
-  findings.push(...evaluateIat(payload, nowSec))
-  findings.push(...evaluateAud(payload))
-  findings.push(...evaluateIss(payload))
+  findings.push(
+    ...evaluateExp(payload, nowSec),
+    ...evaluateNbf(payload, nowSec),
+    ...evaluateIat(payload, nowSec),
+    ...evaluateAud(payload),
+    ...evaluateIss(payload),
+  )
 
   return findings
 }

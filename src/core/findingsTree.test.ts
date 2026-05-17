@@ -661,9 +661,8 @@ describe('buildTokenTree', () => {
 })
 
 // Type-only smoke: ensure the exported types are consumable from tests.
-// Referenced via `() => _typecheckTree` so the declaration is observably used
-// without invoking the `void` operator.
-const _typecheckTree: TreeNodeDto = {
+// `satisfies` keeps the literal narrow while asserting `TreeNodeDto` shape.
+const _typecheckTree = {
   id: 'analyzer:jwt',
   kind: 'analyzerRoot',
   label: 'JWT (0)',
@@ -673,6 +672,4 @@ const _typecheckTree: TreeNodeDto = {
   warningCount: 0,
   infoCount: 0,
   children: [],
-}
-const _typecheckTreeRef = () => _typecheckTree
-_typecheckTreeRef
+} satisfies TreeNodeDto

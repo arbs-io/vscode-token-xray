@@ -95,8 +95,10 @@ export function evaluateSaml(decoded: DecodedSaml, options: SamlFindingOptions =
     })
   }
 
-  findings.push(...evaluateSignature(decoded))
-  findings.push(...evaluateConditions(decoded, now))
+  findings.push(
+    ...evaluateSignature(decoded),
+    ...evaluateConditions(decoded, now),
+  )
 
   if (!decoded.issuer) {
     findings.push({

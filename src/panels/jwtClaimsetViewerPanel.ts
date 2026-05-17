@@ -13,7 +13,7 @@ import { getUri } from '../utils/getUri';
 
 export class JwtClaimsetViewerPanel {
   private static _payload: JwtPanelPayload | undefined;
-  public static currentPanel: JwtClaimsetViewerPanel | undefined;
+  private static currentPanel: JwtClaimsetViewerPanel | undefined;
   private readonly _panel: WebviewPanel;
   private readonly _disposables: Disposable[] = [];
   private readonly _extensionUri: Uri;
