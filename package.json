@@ -2,7 +2,7 @@
   "name": "vscode-token-xray",
   "displayName": "Token X-Ray",
   "description": "X-ray vision for tokens and secrets: locally inspect JWTs, SAML assertions, certificates, OAuth tokens, and detect credentials in any file. No data leaves your machine.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "AndrewButson",
   "icon": "images/vscode-token-xray-light.png",
   "private": true,
