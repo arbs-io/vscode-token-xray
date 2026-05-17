@@ -15,10 +15,12 @@ import { DiagnosticDto } from '../core/diagnostics'
 import { matchIgnore, parseIgnoreFile } from '../core/ignoreFile'
 import {
   DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES,
+  ScanTextMetrics,
   ScanTextSettings,
   scanText,
 } from '../core/scanText'
 import { SeverityOverrideMap } from '../core/severityOverrides'
+import { getDebugLogger } from './debugOutputChannel'
 
 const SEVERITY_MAP: Record<DiagnosticDto['severity'], DiagnosticSeverity> = {
   error: DiagnosticSeverity.Error,
@@ -114,10 +116,30 @@ async function loadIgnorePatterns(folder: WorkspaceFolder): Promise<string[]> {
   }
 }
 
+/**
+ * Format the per-refresh debug summary line. Spec'd by the
+ * `output-channel` enhancement so the channel reads:
+ *
+ *   `<filename>: scanned N tokens, suppressed K (S secrets / I ignored)`
+ *
+ * where K = S + I + (severity-override drops). The two override
+ * buckets are summed into "ignored" because the user-facing
+ * distinction the spec asks for is "secrets-filter drop" (path /
+ * size / disabled) vs. "everything else" (inline directives +
+ * severity overrides), both of which the user controls but in
+ * different ways.
+ */
+function formatScanSummary(label: string, metrics: ScanTextMetrics): string {
+  const ignored = metrics.droppedByDisableComments + metrics.droppedBySeverityOverride
+  const suppressed = metrics.droppedBySecretsFilter + ignored
+  return `${label}: scanned ${metrics.scanned} tokens, suppressed ${suppressed} (${metrics.droppedBySecretsFilter} secrets / ${ignored} ignored)`
+}
+
 export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
   const registry = createDefaultRegistry()
   const collection = languages.createDiagnosticCollection('tokenXray')
   context.subscriptions.push(collection)
+  const debugLog = getDebugLogger(context)
 
   // Per-workspace-folder pattern cache. Refreshed on startup and any
   // time files in the workspace change so adding / editing / deleting
@@ -157,7 +179,24 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     try {
       const settings = readScanSettings(doc.uri)
       const filename = filenameFor(doc)
-      const dtos = await scanText(doc.getText(), filename, registry, settings)
+      // Pretty label for the debug summary: prefer the workspace-
+      // relative path computed by `filenameFor`, fall back to the
+      // URI's last path segment for untitled buffers / files that
+      // aren't inside a workspace folder.
+      const debugLabel =
+        filename ?? doc.uri.path.split('/').pop() ?? doc.uri.toString()
+      const settingsWithDebug: ScanTextSettings = {
+        ...settings,
+        onSuppression: (event) => {
+          debugLog(
+            `${debugLabel}: suppressed ${event.findingId} (${event.analyzerId}) at line ${event.startLine + 1} via ${event.reason}`
+          )
+        },
+        onMetrics: (metrics) => {
+          debugLog(formatScanSummary(debugLabel, metrics))
+        },
+      }
+      const dtos = await scanText(doc.getText(), filename, registry, settingsWithDebug)
       collection.set(doc.uri, dtos.map(dtoToDiagnostic))
     } catch {
       collection.delete(doc.uri)

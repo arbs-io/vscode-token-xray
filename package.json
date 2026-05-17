@@ -206,6 +206,11 @@
               "off"
             ]
           }
+        },
+        "tokenXray.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log scan counts and finding suppressions to the Token X-Ray output channel for troubleshooting."
         }
       }
     },

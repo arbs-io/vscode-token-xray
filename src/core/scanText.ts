@@ -1,7 +1,28 @@
 import { AnalyzerRegistry } from './registry'
-import { DiagnosticDto, diagnosticsAcrossRegistry } from './diagnostics'
+import {
+  DiagnosticDto,
+  DiagnosticsMetrics,
+  SuppressionEvent,
+  diagnosticsAcrossRegistry,
+} from './diagnostics'
 import { matchesAnyGlob } from './globMatch'
 import { SeverityOverrideMap } from './severityOverrides'
+
+/**
+ * Aggregate counters for a single `scanText` call. Sums the registry-
+ * boundary `DiagnosticsMetrics` plus the secret-filter drop bucket so
+ * the provider can format one line per refresh without re-counting.
+ */
+export interface ScanTextMetrics extends DiagnosticsMetrics {
+  /**
+   * Findings dropped because `shouldDropSecrets` returned true (file
+   * size cap, `secrets.enabled = false`, or path matched a
+   * `secrets.exclude` glob).
+   */
+  droppedBySecretsFilter: number
+  /** Final published diagnostic count (post all filters). */
+  published: number
+}
 
 export interface SecretsScanSettings {
   /**
@@ -32,6 +53,20 @@ export interface ScanTextSettings {
    * analyzer's findings — not just secret findings.
    */
   ruleSeverity?: SeverityOverrideMap
+  /**
+   * Optional per-suppression sink. Forwarded to
+   * `diagnosticsAcrossRegistry.onSuppression`. Fires once for every
+   * finding the inline-disable-comment or severity-override pass drops.
+   */
+  onSuppression?: (event: SuppressionEvent) => void
+  /**
+   * Optional aggregate-metrics sink. Fires exactly once per scan,
+   * after both the registry-boundary filters and the secret-filter
+   * step have run. The values are all derived from the pre-existing
+   * `all` / `out` arrays inside `scanText` plus the registry-boundary
+   * `DiagnosticsMetrics` — no new counters are introduced.
+   */
+  onMetrics?: (metrics: ScanTextMetrics) => void
 }
 
 export const DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES = 1_048_576 // 1 MiB
@@ -57,16 +92,49 @@ export async function scanText(
   registry: AnalyzerRegistry,
   settings: ScanTextSettings = {}
 ): Promise<DiagnosticDto[]> {
-  if (!text) return []
+  // Capture the registry-boundary metrics so we can fold them into
+  // the per-scan summary we hand back to the caller. We hold a
+  // partial object and fill it in after the secret filter step.
+  let regMetrics: DiagnosticsMetrics | undefined
+  const captureRegMetrics = (m: DiagnosticsMetrics): void => {
+    regMetrics = m
+  }
+
+  const emitMetrics = (published: number, droppedBySecretsFilter: number): void => {
+    if (!settings.onMetrics) return
+    const base: DiagnosticsMetrics = regMetrics ?? {
+      scanned: 0,
+      droppedBySeverityOverride: 0,
+      droppedByDisableComments: 0,
+    }
+    settings.onMetrics({
+      ...base,
+      droppedBySecretsFilter,
+      published,
+    })
+  }
+
+  if (!text) {
+    emitMetrics(0, 0)
+    return []
+  }
 
   const all = await diagnosticsAcrossRegistry(text, registry, {
     ruleSeverity: settings.ruleSeverity,
+    onSuppression: settings.onSuppression,
+    onMetrics: captureRegMetrics,
   })
-  if (all.length === 0) return all
+  if (all.length === 0) {
+    emitMetrics(0, 0)
+    return all
+  }
 
   if (shouldDropSecrets(text, filename, settings.secrets)) {
-    return all.filter((d) => d.source !== SECRET_SOURCE_ID)
+    const filtered = all.filter((d) => d.source !== SECRET_SOURCE_ID)
+    emitMetrics(filtered.length, all.length - filtered.length)
+    return filtered
   }
+  emitMetrics(all.length, 0)
   return all
 }
 
