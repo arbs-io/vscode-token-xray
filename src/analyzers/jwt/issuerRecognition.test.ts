@@ -125,6 +125,151 @@ describe('recognizeIssuer — Google / Firebase / CI OIDC', () => {
   })
 })
 
+describe('recognizeIssuer — Ping Identity', () => {
+  it('matches PingOne with env id', () => {
+    const r = recognizeIssuer('https://auth.pingone.com/00000000-0000-0000-0000-000000000001/')
+    expect(r?.pattern.id).toBe('pingOne')
+    expect(r?.tenant).toBe('auth')
+    expect(r?.extras.envId).toBe('00000000-0000-0000-0000-000000000001')
+  })
+
+  it('matches PingIdentity cloud', () => {
+    const r = recognizeIssuer('https://acme.pingidentity.cloud/')
+    expect(r?.pattern.id).toBe('pingIdentity')
+    expect(r?.tenant).toBe('acme')
+  })
+
+  it('matches PingIdentity cloud with path suffix', () => {
+    const r = recognizeIssuer('https://acme.pingidentity.cloud/as')
+    expect(r?.pattern.id).toBe('pingIdentity')
+    expect(r?.tenant).toBe('acme')
+  })
+})
+
+describe('recognizeIssuer — ForgeRock', () => {
+  it('matches forgerock.io with /am/oauth2', () => {
+    const r = recognizeIssuer('https://openam-acme.forgerock.io/am/oauth2')
+    expect(r?.pattern.id).toBe('forgerock')
+    expect(r?.tenant).toBe('openam-acme')
+  })
+
+  it('matches identitycloud.com with realm segment', () => {
+    const r = recognizeIssuer('https://acme.identitycloud.com/oauth2/alpha')
+    expect(r?.pattern.id).toBe('forgerock')
+    expect(r?.tenant).toBe('acme')
+  })
+})
+
+describe('recognizeIssuer — OneLogin', () => {
+  it('matches onelogin OIDC v2 endpoint', () => {
+    const r = recognizeIssuer('https://acme.onelogin.com/oidc/2')
+    expect(r?.pattern.id).toBe('oneLogin')
+    expect(r?.tenant).toBe('acme')
+  })
+})
+
+describe('recognizeIssuer — Keycloak', () => {
+  it('matches keycloak /auth/realms/<realm>', () => {
+    const r = recognizeIssuer('https://keycloak.example.com/auth/realms/myrealm')
+    expect(r?.pattern.id).toBe('keycloak')
+    expect(r?.tenant).toBe('myrealm')
+  })
+
+  it('accepts http for self-hosted dev instances', () => {
+    const r = recognizeIssuer('http://localhost:8080/auth/realms/dev')
+    expect(r?.pattern.id).toBe('keycloak')
+    expect(r?.tenant).toBe('dev')
+  })
+})
+
+describe('recognizeIssuer — Salesforce', () => {
+  it('matches login.salesforce.com (no tenant)', () => {
+    const r = recognizeIssuer('https://login.salesforce.com/')
+    expect(r?.pattern.id).toBe('salesforce')
+    expect(r?.tenant).toBeUndefined()
+  })
+
+  it('matches my.salesforce.com tenant subdomain', () => {
+    const r = recognizeIssuer('https://acme.my.salesforce.com/')
+    expect(r?.pattern.id).toBe('salesforce')
+    expect(r?.tenant).toBe('acme')
+  })
+})
+
+describe('recognizeIssuer — Apple', () => {
+  it('matches appleid.apple.com', () => {
+    const r = recognizeIssuer('https://appleid.apple.com')
+    expect(r?.pattern.id).toBe('appleId')
+    expect(r?.tenant).toBeUndefined()
+  })
+})
+
+describe('recognizeIssuer — Microsoft B2C', () => {
+  it('matches b2clogin with tenant id and v2.0 suffix', () => {
+    const r = recognizeIssuer(
+      'https://contoso.b2clogin.com/00000000-0000-0000-0000-000000000001/v2.0/'
+    )
+    expect(r?.pattern.id).toBe('microsoftB2C')
+    expect(r?.tenant).toBe('00000000-0000-0000-0000-000000000001')
+    expect(r?.extras.account).toBe('contoso')
+  })
+})
+
+describe('recognizeIssuer — Clerk', () => {
+  it('matches clerk.accounts.dev', () => {
+    const r = recognizeIssuer('https://crisp-yak-42.clerk.accounts.dev')
+    expect(r?.pattern.id).toBe('clerk')
+    expect(r?.tenant).toBe('crisp-yak-42')
+  })
+})
+
+describe('recognizeIssuer — WorkOS', () => {
+  it('matches api.workos.com', () => {
+    const r = recognizeIssuer('https://api.workos.com')
+    expect(r?.pattern.id).toBe('workOs')
+    expect(r?.tenant).toBeUndefined()
+  })
+})
+
+describe('recognizeIssuer — Frontegg', () => {
+  it('matches frontegg subdomain', () => {
+    const r = recognizeIssuer('https://acme.frontegg.com/')
+    expect(r?.pattern.id).toBe('frontegg')
+    expect(r?.tenant).toBe('acme')
+  })
+})
+
+describe('recognizeIssuer — Descope', () => {
+  it('matches descope project id (v1 prefix)', () => {
+    const r = recognizeIssuer('https://api.descope.com/v1/P2abc123XYZ')
+    expect(r?.pattern.id).toBe('descope')
+    expect(r?.tenant).toBe('P2abc123XYZ')
+  })
+
+  it('matches descope project id without v1 prefix', () => {
+    const r = recognizeIssuer('https://api.descope.com/P2abc123XYZ')
+    expect(r?.pattern.id).toBe('descope')
+    expect(r?.tenant).toBe('P2abc123XYZ')
+  })
+})
+
+describe('recognizeIssuer — Twitch / LinkedIn / Discord', () => {
+  it('matches Twitch OIDC', () => {
+    const r = recognizeIssuer('https://id.twitch.tv/oauth2')
+    expect(r?.pattern.id).toBe('twitch')
+  })
+
+  it('matches LinkedIn', () => {
+    const r = recognizeIssuer('https://www.linkedin.com')
+    expect(r?.pattern.id).toBe('linkedin')
+  })
+
+  it('matches Discord', () => {
+    const r = recognizeIssuer('https://discord.com')
+    expect(r?.pattern.id).toBe('discord')
+  })
+})
+
 describe('recognizeIssuer — negatives', () => {
   it('returns undefined for empty / non-string', () => {
     expect(recognizeIssuer('')).toBeUndefined()
@@ -133,6 +278,10 @@ describe('recognizeIssuer — negatives', () => {
 
   it('returns undefined for unrelated URLs', () => {
     expect(recognizeIssuer('https://example.com')).toBeUndefined()
+  })
+
+  it('returns undefined for unrelated oauth2 URL', () => {
+    expect(recognizeIssuer('https://random.example.com/oauth2')).toBeUndefined()
   })
 
   it('does not match Entra v2 without /v2.0 suffix', () => {
