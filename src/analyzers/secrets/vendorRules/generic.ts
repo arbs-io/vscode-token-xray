@@ -64,7 +64,7 @@ function countCharClasses(raw: string): number {
   let classes = 0
   if (/[a-z]/.test(raw)) classes++
   if (/[A-Z]/.test(raw)) classes++
-  if (/[0-9]/.test(raw)) classes++
+  if (/\d/.test(raw)) classes++
   if (/[+/=_-]/.test(raw)) classes++
   return classes
 }

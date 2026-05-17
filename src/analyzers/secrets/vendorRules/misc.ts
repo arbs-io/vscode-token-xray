@@ -79,7 +79,7 @@ const DIGITALOCEAN_PAT: SecretRule = {
   id: 'secret.digitalocean.personalAccessToken',
   vendor: 'digitalocean',
   name: 'DigitalOcean personal access token (dop_v1_…)',
-  pattern: /(?<![A-Za-z0-9_])dop_v1_[a-f0-9]{64}(?![A-Za-z0-9])/g,
+  pattern: /(?<!\w)dop_v1_[a-f0-9]{64}(?![A-Za-z0-9])/g,
   severity: 'error',
   description:
     'DigitalOcean personal access token. Grants full DigitalOcean API access (droplets, networking, billing) on behalf of the issuing user — revoke immediately via the DigitalOcean control panel if leaked.',

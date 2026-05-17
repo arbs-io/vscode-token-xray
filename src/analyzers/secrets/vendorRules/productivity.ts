@@ -41,7 +41,7 @@ const LINEAR_API_KEY: SecretRule = {
   id: 'secret.linear.apiKey',
   vendor: 'linear',
   name: 'Linear personal API key (lin_api_…)',
-  pattern: /(?<![A-Za-z0-9_])lin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9])/g,
+  pattern: /(?<!\w)lin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9])/g,
   severity: 'error',
   description:
     'Linear personal API key. Authenticates against the Linear GraphQL API as the issuing user — revoke immediately via the Linear settings if leaked.',
@@ -57,7 +57,7 @@ const LINEAR_OAUTH_TOKEN: SecretRule = {
   id: 'secret.linear.oauthToken',
   vendor: 'linear',
   name: 'Linear OAuth access token (lin_oauth_…)',
-  pattern: /(?<![A-Za-z0-9_])lin_oauth_[A-Za-z0-9]{40,}(?![A-Za-z0-9])/g,
+  pattern: /(?<!\w)lin_oauth_[A-Za-z0-9]{40,}(?![A-Za-z0-9])/g,
   severity: 'error',
   description:
     'Linear OAuth access token. Grants Linear GraphQL API access on behalf of the issuing user / workspace — revoke immediately if leaked.',

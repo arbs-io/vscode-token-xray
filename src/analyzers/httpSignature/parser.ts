@@ -125,11 +125,11 @@ export function parseCavageSignature(header: string): CavageSig | undefined {
   for (const part of parts) {
     const trimmedPart = part.trim()
     if (trimmedPart.length === 0) continue
-    const m = /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*("([^"]*)"|([0-9]+))\s*$/.exec(trimmedPart)
+    const m = /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*("([^"]*)"|(\d+))\s*$/.exec(trimmedPart)
     if (!m) return undefined
     const key = m[1].toLowerCase()
     // Quoted value is in group 3; bare numeric value is in group 4.
-    const value = m[3] !== undefined ? m[3] : m[4]
+    const value = m[3] ?? m[4]
     fields[key] = value
   }
 
@@ -231,10 +231,10 @@ export function parseRfc9421(
     for (const part of splitParams(paramsRaw)) {
       const trimmedPart = part.trim()
       if (trimmedPart.length === 0) continue
-      const m = /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*("([^"]*)"|([0-9]+))\s*$/.exec(trimmedPart)
+      const m = /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*("([^"]*)"|(\d+))\s*$/.exec(trimmedPart)
       if (!m) continue
       const key = m[1].toLowerCase()
-      const value = m[3] !== undefined ? m[3] : m[4]
+      const value = m[3] ?? m[4]
       if (key === 'keyid') result.keyId = value
       else if (key === 'nonce') result.nonce = value
       else if (key === 'alg' || key === 'algorithm') result.algorithm = value

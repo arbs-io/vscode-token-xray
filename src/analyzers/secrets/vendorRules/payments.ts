@@ -67,7 +67,7 @@ const PAYPAL_ACCESS_TOKEN: SecretRule = {
   id: 'secret.paypal.accessToken',
   vendor: 'paypal',
   name: 'PayPal long-form access token (access_token$…)',
-  pattern: /(?<![A-Za-z0-9_])access_token\$(?:production|sandbox)\$[a-z0-9]+\$[a-f0-9]{32}(?![A-Za-z0-9_])/g,
+  pattern: /(?<!\w)access_token\$(?:production|sandbox)\$[a-z0-9]+\$[a-f0-9]{32}(?!\w)/g,
   severity: 'error',
   description:
     'PayPal long-form OAuth 2.0 access token. Authenticates against the PayPal REST APIs (payments, invoicing) on behalf of the issuing merchant — revoke immediately if leaked.',

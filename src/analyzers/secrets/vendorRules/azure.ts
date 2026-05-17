@@ -35,7 +35,7 @@ const SAS_TOKEN: SecretRule = {
   id: 'secret.azure.sasToken',
   vendor: 'azure',
   name: 'Azure SAS token (query string)',
-  pattern: /\bsv=\d{4}-\d{2}-\d{2}(?:&[A-Za-z0-9_-]+=[^&\s"<>]*){1,}&sig=[A-Za-z0-9%/+]+(?:&[A-Za-z0-9_-]+=[^&\s"<>]*)*/g,
+  pattern: /\bsv=\d{4}-\d{2}-\d{2}(?:&[A-Za-z0-9_-]+=[^&\s"<>]*)+&sig=[A-Za-z0-9%/+]+(?:&[A-Za-z0-9_-]+=[^&\s"<>]*)*/g,
   severity: 'error',
   description:
     'Azure Shared Access Signature token (signed URL fragment). Whoever holds it has the granted permissions until "se" expiry.',

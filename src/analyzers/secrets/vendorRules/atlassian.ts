@@ -20,7 +20,7 @@ const ATLASSIAN_API_TOKEN: SecretRule = {
   id: 'secret.atlassian.apiToken',
   vendor: 'atlassian',
   name: 'Atlassian Cloud API token (ATATT3xFfGF0…)',
-  pattern: /(?<![A-Za-z0-9_])ATATT3xFfGF0[A-Za-z0-9_=+-]{180,}[A-Za-z0-9]{8}(?![A-Za-z0-9_])/g,
+  pattern: /(?<!\w)ATATT3xFfGF0[A-Za-z0-9_=+-]{180,}[A-Za-z0-9]{8}(?!\w)/g,
   severity: 'error',
   description:
     'Atlassian Cloud API token (e.g. Jira / Confluence Cloud). Grants account-level API access — revoke immediately if leaked.',
