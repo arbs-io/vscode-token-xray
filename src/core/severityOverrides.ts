@@ -1,4 +1,4 @@
-import { Finding, Severity } from './types'
+import { Finding } from './types'
 
 /**
  * Per-rule severity override value. `off` suppresses the finding outright;
