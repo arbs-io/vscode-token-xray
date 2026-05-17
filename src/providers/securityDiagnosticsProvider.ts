@@ -58,7 +58,11 @@ function dtoToDiagnostic(dto: DiagnosticDto): Diagnostic {
     dto.message,
     SEVERITY_MAP[dto.severity]
   )
-  diag.source = dto.source
+  // The diagnostic source is the user-visible label in the Problems panel
+  // AND the filter used by the findings tree view and status bar badge,
+  // so we pin it to the constant 'tokenXray'. The originating analyzer id
+  // remains recoverable via the first dot-segment of `code` (e.g. `jwt.*`).
+  diag.source = 'tokenXray'
   diag.code = dto.code
   return diag
 }
