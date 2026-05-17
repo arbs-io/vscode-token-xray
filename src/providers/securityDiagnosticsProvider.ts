@@ -7,6 +7,7 @@ import {
   Range,
   TextDocument,
   Uri,
+  window,
   workspace,
   WorkspaceFolder,
 } from 'vscode'
@@ -20,6 +21,7 @@ import {
   scanText,
 } from '../core/scanText'
 import { SeverityOverrideMap } from '../core/severityOverrides'
+import { effectiveTabUri, openTabUriStrings } from '../utils/openTabs'
 import { getDebugLogger } from './debugOutputChannel'
 
 const SEVERITY_MAP: Record<DiagnosticDto['severity'], DiagnosticSeverity> = {
@@ -188,6 +190,27 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     }
   }
 
+  // Per-URI scan-generation map. `claimScan` issues a globally-unique
+  // token; `isLatestScan` answers whether that token is still the most
+  // recent one for the URI; `invalidateScan` drops the URI's slot so any
+  // in-flight `scanText` whose promise resolves later won't publish. The
+  // counter is global (not per-URI) so a freshly-claimed token can never
+  // collide with one stored by a previous invalidated scan for the same
+  // URI. This is what prevents stale diagnostics from being re-published
+  // after the tab closes (or a newer scan supersedes the in-flight one).
+  let scanCounter = 0
+  const scanTokens = new Map<string, number>()
+  const claimScan = (uri: Uri): number => {
+    const token = ++scanCounter
+    scanTokens.set(uri.toString(), token)
+    return token
+  }
+  const isLatestScan = (uri: Uri, token: number): boolean =>
+    scanTokens.get(uri.toString()) === token
+  const invalidateScan = (uri: Uri): void => {
+    scanTokens.delete(uri.toString())
+  }
+
   /** True when any workspace folder's `.tokenxrayignore` excludes this doc. */
   const isIgnored = (doc: TextDocument): boolean => {
     // Resolve to the on-disk URI: for notebook cells that's the parent
@@ -204,6 +227,10 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
   }
 
   const refresh = async (doc: TextDocument) => {
+    // Claim the latest scan slot for this URI up-front so any earlier
+    // in-flight scan is invalidated even if we exit through the
+    // unsupported / ignored / error paths below.
+    const token = claimScan(doc.uri)
     if (!SUPPORTED_SCHEMES.has(doc.uri.scheme)) {
       collection.delete(doc.uri)
       return
@@ -233,14 +260,28 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
         },
       }
       const dtos = await scanText(doc.getText(), filename, registry, settingsWithDebug)
+      // Drop results when our token is no longer the latest: either the
+      // tab was closed mid-scan (token invalidated) or another refresh
+      // for the same URI raced past us (token superseded).
+      if (!isLatestScan(doc.uri, token)) return
       collection.set(doc.uri, dtos.map(dtoToDiagnostic))
     } catch {
-      collection.delete(doc.uri)
+      if (isLatestScan(doc.uri, token)) collection.delete(doc.uri)
     }
   }
 
   const refreshAll = () => {
+    // `workspace.textDocuments` can include documents whose tabs have
+    // already been closed (VS Code keeps the buffer alive past the tab),
+    // so we drop those before rescanning — otherwise `refresh()` would
+    // re-publish diagnostics for a file the user can no longer see.
+    const openTabs = openTabUriStrings()
     for (const doc of workspace.textDocuments) {
+      if (!openTabs.has(effectiveTabUri(doc.uri).toString())) {
+        invalidateScan(doc.uri)
+        collection.delete(doc.uri)
+        continue
+      }
       void refresh(doc)
     }
   }
@@ -268,7 +309,30 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
   context.subscriptions.push(
     workspace.onDidOpenTextDocument((doc) => void refresh(doc)),
     workspace.onDidChangeTextDocument((e) => void refresh(e.document)),
-    workspace.onDidCloseTextDocument((doc) => collection.delete(doc.uri)),
+    workspace.onDidCloseTextDocument((doc) => {
+      invalidateScan(doc.uri)
+      collection.delete(doc.uri)
+    }),
+    // `onDidCloseTextDocument` is not guaranteed to fire when the user
+    // closes a tab (VS Code may keep the doc alive), so we also reconcile
+    // against the live tab list — anything no longer in any tab gets its
+    // diagnostics cleared from the Problems panel AND its in-flight scan
+    // invalidated so a slow `scanText` doesn't re-publish stale results.
+    window.tabGroups.onDidChangeTabs((event) => {
+      if (event.closed.length === 0) return
+      const openTabs = openTabUriStrings()
+      for (const key of Array.from(scanTokens.keys())) {
+        const uri = Uri.parse(key)
+        if (!openTabs.has(effectiveTabUri(uri).toString())) {
+          scanTokens.delete(key)
+        }
+      }
+      collection.forEach((uri) => {
+        if (!openTabs.has(effectiveTabUri(uri).toString())) {
+          collection.delete(uri)
+        }
+      })
+    }),
     workspace.onDidChangeConfiguration((e) => {
       if (
         !e.affectsConfiguration('tokenXray.secrets') &&

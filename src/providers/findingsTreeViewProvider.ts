@@ -22,8 +22,9 @@ import {
   TreeNodeDto,
   WorkspaceToken,
 } from '../core/findingsTree'
-import { scanDocument } from '../core/scanDocument'
-import { Match, Severity } from '../core/types'
+import { ScanCache } from '../core/scanCache'
+import { Severity } from '../core/types'
+import { effectiveTabUri, openTabUriStrings } from '../utils/openTabs'
 
 const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell'])
 
@@ -61,6 +62,14 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
   private readonly _onDidChange = new EventEmitter<TreeNodeDto | undefined | void>()
   readonly onDidChangeTreeData: Event<TreeNodeDto | undefined | void> = this._onDidChange.event
   private cachedRoots: TreeNodeDto[] = []
+  private readonly scanCache: ScanCache
+
+  constructor(scanCache?: ScanCache) {
+    // Default to a private cache when none is supplied so direct callers
+    // (notably tests) work without DI. In production `extension.ts`
+    // hands in the shared instance the diagnostics provider also uses.
+    this.scanCache = scanCache ?? new ScanCache()
+  }
 
   refresh(): void {
     this.cachedRoots = buildTokenTree(this.collectTokens())
@@ -94,54 +103,41 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
   }
 
   private collectTokens(): WorkspaceToken[] {
+    // `workspace.textDocuments` can hold "ghost" documents whose tabs were
+    // closed (VS Code is allowed to keep the TextDocument alive after the
+    // tab disappears), so we cross-reference against the live tab list to
+    // drop their tokens from the tree.
+    const openTabs = openTabUriStrings()
     const tokens: WorkspaceToken[] = []
     for (const doc of workspace.textDocuments) {
       if (!SUPPORTED_SCHEMES.has(doc.uri.scheme)) continue
+      if (!openTabs.has(effectiveTabUri(doc.uri).toString())) continue
       tokens.push(...this.scanDocumentTokens(doc))
     }
     return tokens
   }
 
   private scanDocumentTokens(doc: TextDocument): WorkspaceToken[] {
-    let hits: ReturnType<typeof scanDocument>
-    try {
-      hits = scanDocument(doc.getText(), this.registry)
-    } catch {
-      return []
-    }
-    const out: WorkspaceToken[] = []
+    // The cache owns the scanDocument + per-match analyze pipeline.
+    // We just attach the workspace-relative `filePath` on the way out
+    // — the cache is path-agnostic so workspace-folder changes don't
+    // force re-analysis.
+    const cached = this.scanCache.getTokens({
+      uriKey: doc.uri.toString(),
+      version: doc.version,
+      text: doc.getText(),
+      registry: this.registry,
+    })
     const filePath = this.workspaceRelativePath(doc.uri)
-    for (const hit of hits) {
-      const analyzer = this.registry.get(hit.analyzerId)
-      if (!analyzer) continue
-      const match: Match = {
-        text: hit.text,
-        range: { start: hit.startOffset, end: hit.endOffset },
-      }
-      try {
-        const result = analyzer.analyze(match)
-        // `analyze` may be sync or return a Promise; we ignore async results to
-        // keep refresh() synchronous. All shipped analyzers are sync.
-        if (result instanceof Promise) continue
-        out.push({
-          filePath,
-          analyzerId: hit.analyzerId,
-          analyzerName: hit.analyzerName,
-          kind: result.kind ?? '',
-          range: {
-            startLine: hit.startLine,
-            startColumn: hit.startColumn,
-            endLine: hit.endLine,
-            endColumn: hit.endColumn,
-          },
-          sections: result.sections ?? [],
-          findings: result.findings ?? [],
-        })
-      } catch {
-        // skip on analyze failure
-      }
-    }
-    return out
+    return cached.map((t) => ({
+      filePath,
+      analyzerId: t.analyzerId,
+      analyzerName: t.analyzerName,
+      kind: t.kind,
+      range: t.range,
+      sections: t.sections,
+      findings: t.findings,
+    }))
   }
 
   private workspaceRelativePath(uri: Uri): string {
@@ -223,21 +219,53 @@ export function rangeFromVscodeRange(r: Range): FindingTreeRange {
   }
 }
 
-export function registerFindingsTreeViewProvider(context: ExtensionContext): void {
-  const provider = new FindingsTreeViewProvider()
+const REFRESH_DEBOUNCE_MS = 50
+
+export function registerFindingsTreeViewProvider(
+  context: ExtensionContext,
+  scanCache?: ScanCache
+): void {
+  const provider = new FindingsTreeViewProvider(scanCache)
   provider.refresh()
   const treeView = window.createTreeView('tokenXray.findings', {
     treeDataProvider: provider,
     showCollapseAll: true,
   })
-  // Re-scan on document open/change/close and on diagnostic refreshes (which
-  // happen after the secret scanner runs — useful for keeping the tree in sync
-  // when nothing else fires a text-document event).
+
+  // Coalesce rapid events (a keystroke fires onDidChangeTextDocument
+  // plus a follow-up onDidChangeDiagnostics) into a single rebuild on
+  // the trailing edge. 50ms is short enough to feel instant and long
+  // enough to absorb a burst of paired events.
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined
+  const scheduleRefresh = () => {
+    if (refreshTimer) clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined
+      provider.refresh()
+    }, REFRESH_DEBOUNCE_MS)
+  }
+
+  // Re-scan on document open/change/close, on diagnostic refreshes (which
+  // happen after the secret scanner runs), and on tab open/close. The tab
+  // listener catches "user closed the tab but VS Code kept the doc in
+  // memory" — `onDidCloseTextDocument` is not guaranteed to fire in that
+  // case (see the API docs note). `event.changed` is intentionally ignored
+  // because it covers active-state / dirty-state flips that don't affect
+  // which tokens the tree should show.
   context.subscriptions.push(
     treeView,
-    workspace.onDidOpenTextDocument(() => provider.refresh()),
-    workspace.onDidCloseTextDocument(() => provider.refresh()),
-    workspace.onDidChangeTextDocument(() => provider.refresh()),
-    languages.onDidChangeDiagnostics(() => provider.refresh())
+    workspace.onDidOpenTextDocument(scheduleRefresh),
+    workspace.onDidCloseTextDocument(scheduleRefresh),
+    workspace.onDidChangeTextDocument(scheduleRefresh),
+    languages.onDidChangeDiagnostics(scheduleRefresh),
+    window.tabGroups.onDidChangeTabs((event) => {
+      if (event.opened.length === 0 && event.closed.length === 0) return
+      scheduleRefresh()
+    }),
+    {
+      dispose: () => {
+        if (refreshTimer) clearTimeout(refreshTimer)
+      },
+    }
   )
 }

@@ -2,6 +2,7 @@ import { ExtensionContext } from 'vscode'
 import { registerInspectCommand } from './contexts/registerInspectCommand'
 import { registerShowClaimsetPreviewCommand } from './contexts/registerShowClaimsetPreviewCommand'
 import { registerShowJsonPreviewCommand } from './contexts/registerShowJsonPreviewCommand'
+import { ScanCache } from './core/scanCache'
 import { registerDebugOutputChannel } from './providers/debugOutputChannel'
 import { registerDocumentLinksProvider } from './providers/documentLinksProvider'
 import { registerDocumentSemanticTokensProvider } from './providers/documentSemanticTokensProvider'
@@ -9,6 +10,7 @@ import { registerDocumentSymbolsProvider } from './providers/documentSymbolsProv
 import { registerFindingsTreeViewProvider } from './providers/findingsTreeViewProvider'
 import { registerHoverProvider } from './providers/hoverProvider'
 import { registerInlayHintsProvider } from './providers/inlayHintsProvider'
+import { registerScanCacheLifecycle } from './providers/scanCacheLifecycle'
 import { registerSecretCodeActionsProvider } from './providers/secretCodeActionsProvider'
 import { registerSecurityCodeLensProvider } from './providers/securityCodeLensProvider'
 import { registerSecurityDiagnosticsProvider } from './providers/securityDiagnosticsProvider'
@@ -22,6 +24,13 @@ export function activate(context: ExtensionContext) {
   // the user enables `tokenXray.debug`.
   registerDebugOutputChannel(context)
 
+  // Single per-activation scan cache. Each `(uri, version)` pair is
+  // tokenised + analyzed at most once even when several providers
+  // consume the result. The lifecycle helper drops entries when docs
+  // or tabs close so closed-and-reopened files are scanned fresh.
+  const scanCache = new ScanCache()
+  registerScanCacheLifecycle(context, scanCache)
+
   // Generic, content-driven analysis — works on any open document.
   registerSecurityCodeLensProvider(context)
   registerSecurityDiagnosticsProvider(context)
@@ -29,7 +38,7 @@ export function activate(context: ExtensionContext) {
   registerInlayHintsProvider(context)
   registerDocumentLinksProvider(context)
   registerDocumentSymbolsProvider(context)
-  registerFindingsTreeViewProvider(context)
+  registerFindingsTreeViewProvider(context, scanCache)
   registerStatusBarBadgeProvider(context)
   registerInspectCommand(context)
 
