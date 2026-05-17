@@ -3,9 +3,11 @@ import {
   Event,
   EventEmitter,
   ExtensionContext,
+  MarkdownString,
   ProviderResult,
   Range,
   TextDocument,
+  ThemeColor,
   ThemeIcon,
   TreeDataProvider,
   TreeItem,
@@ -28,10 +30,66 @@ import { effectiveTabUri, openTabUriStrings } from '../utils/openTabs'
 
 const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell'])
 
+const SEVERITY_COLOR: Record<Severity, ThemeColor> = {
+  error: new ThemeColor('list.errorForeground'),
+  warning: new ThemeColor('list.warningForeground'),
+  info: new ThemeColor('charts.blue'),
+}
+
 const SEVERITY_ICON: Record<Severity, ThemeIcon> = {
-  error: new ThemeIcon('error'),
-  warning: new ThemeIcon('warning'),
-  info: new ThemeIcon('info'),
+  error: new ThemeIcon('error', SEVERITY_COLOR.error),
+  warning: new ThemeIcon('warning', SEVERITY_COLOR.warning),
+  info: new ThemeIcon('info', SEVERITY_COLOR.info),
+}
+
+/**
+ * Per-analyzer codicon for the token-row glyph. Picked so each
+ * detector class is distinguishable at a glance without having to read
+ * the analyzer name. Falls back to a generic key when an analyzer id
+ * isn't in the table (e.g. third-party analyzers registered later).
+ */
+const ANALYZER_ICON: Record<string, string> = {
+  jwt: 'key',
+  jwk: 'symbol-key',
+  saml: 'shield',
+  samlMetadata: 'book',
+  x509: 'verified',
+  csr: 'request-changes',
+  oauth: 'account',
+  oidcDiscovery: 'link-external',
+  cookie: 'database',
+  paseto: 'symbol-keyword',
+  basicAuth: 'lock',
+  awsSigv4: 'cloud',
+  pgp: 'gist-secret',
+  sshKey: 'terminal',
+  httpSignature: 'note',
+  secret: 'eye-closed',
+}
+
+/**
+ * Codicon for common section titles emitted by the analyzers. Matched
+ * case-insensitively against the section's first word so titles like
+ * "Cookie: session" still pick up the "cookie" entry. Untitled or
+ * unrecognised sections fall back to `list-unordered`.
+ */
+const SECTION_ICON: Record<string, string> = {
+  header: 'symbol-namespace',
+  jose: 'symbol-namespace',
+  claims: 'symbol-property',
+  payload: 'symbol-property',
+  certificate: 'verified',
+  cookie: 'database',
+  credentials: 'account',
+  signature: 'edit',
+  block: 'archive',
+  token: 'key',
+  endpoints: 'link',
+  capabilities: 'list-flat',
+  overview: 'list-tree',
+  subject: 'symbol-class',
+  key: 'symbol-key',
+  metadata: 'book',
 }
 
 /**
@@ -83,15 +141,21 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
     if (element.description) item.description = element.description
 
     if (element.kind === 'tokenRoot') {
-      item.iconPath = this.severityIconFor(element)
-      item.tooltip = this.describeCounts(element)
+      item.iconPath = this.tokenRootIcon(element)
+      item.description = this.tokenRootDescription(element)
+      item.tooltip = this.tokenRootTooltip(element)
       item.command = this.revealCommandFor(element)
     } else if (element.kind === 'finding' && element.severity) {
       item.iconPath = SEVERITY_ICON[element.severity]
       item.tooltip = `${element.findingId ?? ''}\n${element.message ?? ''}`.trim()
       item.command = this.revealCommandFor(element)
+    } else if (element.kind === 'sectionGroup') {
+      item.iconPath = this.sectionGroupIcon(element)
     } else if (element.kind === 'sectionRow') {
+      item.iconPath = new ThemeIcon('dash')
       item.tooltip = element.rowDescription
+    } else if (element.kind === 'findingsGroup') {
+      item.iconPath = new ThemeIcon('bell-dot', SEVERITY_COLOR.warning)
     }
 
     return item
@@ -163,11 +227,67 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
     return TreeItemCollapsibleState.None
   }
 
-  private severityIconFor(element: TreeNodeDto): ThemeIcon {
-    if ((element.errorCount ?? 0) > 0) return SEVERITY_ICON.error
-    if ((element.warningCount ?? 0) > 0) return SEVERITY_ICON.warning
-    if ((element.infoCount ?? 0) > 0) return SEVERITY_ICON.info
-    return new ThemeIcon('symbol-key')
+  /**
+   * Token-row glyph: the analyzer's signature codicon, tinted with the
+   * worst-severity colour so a quick scan tells the user *both* what
+   * the detector is and how serious the findings are. Falls back to
+   * `key` when the analyzer id isn't in {@link ANALYZER_ICON} (e.g.
+   * third-party analyzers registered via DI in tests).
+   */
+  private tokenRootIcon(element: TreeNodeDto): ThemeIcon {
+    const iconId = ANALYZER_ICON[element.analyzerId ?? ''] ?? 'key'
+    const tint = this.worstSeverityColor(element)
+    return tint ? new ThemeIcon(iconId, tint) : new ThemeIcon(iconId)
+  }
+
+  /**
+   * Inline "description" text shown to the right of the token label:
+   * the file location plus a compact severity badge when findings
+   * exist. Keeps the per-row width tight so the activity-bar view
+   * doesn't wrap on narrow sidebars.
+   */
+  private tokenRootDescription(element: TreeNodeDto): string | undefined {
+    const location = element.description
+    const counts = this.compactCountBadge(element)
+    if (location && counts) return `${location} · ${counts}`
+    return location ?? counts
+  }
+
+  /**
+   * Multi-line markdown tooltip for the token row. Shown on hover —
+   * doesn't replace the visible icon/description, so the extra detail
+   * (full counts breakdown) lives here instead of cluttering the tree.
+   */
+  private tokenRootTooltip(element: TreeNodeDto): MarkdownString | undefined {
+    const lines: string[] = []
+    const name = element.analyzerName ?? 'Token'
+    lines.push(`**${name}**`)
+    if (element.description) lines.push(`\`${element.description}\``)
+    const breakdown = this.describeCounts(element)
+    if (breakdown) lines.push(breakdown)
+    if (lines.length === 1) return undefined
+    const md = new MarkdownString(lines.join('\n\n'))
+    md.isTrusted = false
+    return md
+  }
+
+  private worstSeverityColor(element: TreeNodeDto): ThemeColor | undefined {
+    if ((element.errorCount ?? 0) > 0) return SEVERITY_COLOR.error
+    if ((element.warningCount ?? 0) > 0) return SEVERITY_COLOR.warning
+    if ((element.infoCount ?? 0) > 0) return SEVERITY_COLOR.info
+    return undefined
+  }
+
+  private compactCountBadge(element: TreeNodeDto): string | undefined {
+    const e = element.errorCount ?? 0
+    const w = element.warningCount ?? 0
+    const i = element.infoCount ?? 0
+    if (e + w + i === 0) return undefined
+    const parts: string[] = []
+    if (e > 0) parts.push(`${e}E`)
+    if (w > 0) parts.push(`${w}W`)
+    if (i > 0) parts.push(`${i}I`)
+    return parts.join(' ')
   }
 
   private describeCounts(element: TreeNodeDto): string | undefined {
@@ -180,6 +300,21 @@ export class FindingsTreeViewProvider implements TreeDataProvider<TreeNodeDto> {
     }
     if ((element.infoCount ?? 0) > 0) parts.push(`${element.infoCount} info`)
     return parts.length === 0 ? undefined : parts.join(', ')
+  }
+
+  /**
+   * Section header glyph: matches the section title's first significant
+   * word against {@link SECTION_ICON}. We strip leading punctuation
+   * ("Cookie: name" → "cookie") so analyzer-supplied titles keep their
+   * cosmetic suffix without losing the icon mapping.
+   */
+  private sectionGroupIcon(element: TreeNodeDto): ThemeIcon {
+    const first = (element.label ?? '')
+      .replace(/^[^A-Za-z]+/, '')
+      .split(/[\s:&]+/)[0]
+      ?.toLowerCase()
+    const iconId = (first && SECTION_ICON[first]) || 'list-unordered'
+    return new ThemeIcon(iconId)
   }
 
   private revealCommandFor(element: TreeNodeDto): Command | undefined {

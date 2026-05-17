@@ -111,6 +111,17 @@ export class JwtClaimsetViewerPanel {
    * @remarks This is also the place where references to the React webview build files
    * are created and inserted into the webview HTML.
    *
+   * CSP policy:
+   *   - `default-src 'none'` denies everything not explicitly allowed.
+   *   - `script-src 'nonce-<n>'` only the bundled webview script can execute.
+   *   - `style-src ${cspSource} 'unsafe-inline'` — the React tree (App.tsx)
+   *     uses inline `style={}` props heavily; removing 'unsafe-inline'
+   *     would break the panel without a CSS-module refactor. The webview
+   *     itself is local-only and receives no untrusted HTML, so the
+   *     residual XSS surface is the bundled script we ship.
+   *   - `img-src ${cspSource} data:` — bundled icons + data-URI sparklines
+   *     only; the previous `*` wildcard is gone.
+   *
    * @param webview A reference to the extension webview
    * @param extensionUri The URI of the directory containing the extension
    * @returns A template string literal containing the HTML that should be
@@ -136,7 +147,7 @@ export class JwtClaimsetViewerPanel {
         <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * 'self' data: https:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
           <link rel="stylesheet" type="text/css" href="${stylesUri}">
           <title>Claimset</title>
         </head>

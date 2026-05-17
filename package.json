@@ -2,7 +2,7 @@
   "name": "vscode-token-xray",
   "displayName": "Token X-Ray",
   "description": "X-ray vision for tokens and secrets: locally inspect JWTs, SAML assertions, certificates, OAuth tokens, and detect credentials in any file. No data leaves your machine.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "AndrewButson",
   "icon": "images/vscode-token-xray-light.png",
   "private": true,
@@ -18,14 +18,27 @@
     "vscode": "^1.81.0"
   },
   "categories": [
+    "Linters",
     "Other"
+  ],
+  "keywords": [
+    "jwt",
+    "saml",
+    "x509",
+    "secrets",
+    "oauth",
+    "token",
+    "jwk",
+    "paseto",
+    "security"
   ],
   "workspaces": [
     "webview"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "check-version": "node ./utilities/scripts/check-version.js",
+    "vscode:prepublish": "npm run check-version && npm run esbuild-base -- --minify",
     "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=es2020",
     "esbuild": "npm run esbuild-base -- --sourcemap",
     "esbuild-watch": "npm run build && npm run -S esbuild-base -- --sourcemap --watch",
@@ -56,7 +69,9 @@
       "tokenXray": [
         {
           "id": "tokenXray.findings",
-          "name": "Findings"
+          "name": "Findings",
+          "icon": "images/vscode-token-xray.svg",
+          "contextualTitle": "Token X-Ray Findings"
         }
       ]
     },
@@ -165,6 +180,11 @@
           "items": {
             "type": "object"
           }
+        },
+        "tokenXray.respectGitignore": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, patterns from the workspace root's .gitignore are merged with .tokenxrayignore so gitignored files (e.g., .env, secrets/) are skipped by every analyzer. Disable to scan gitignored files anyway."
         },
         "tokenXray.secrets.enabled": {
           "type": "boolean",

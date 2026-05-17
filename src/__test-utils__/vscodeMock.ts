@@ -126,12 +126,30 @@ class FakeUri {
 }
 
 class FakeRange {
+  readonly startLine: number
+  readonly startColumn: number
+  readonly endLine: number
+  readonly endColumn: number
   constructor(
-    readonly startLine: number,
-    readonly startColumn: number,
-    readonly endLine: number,
-    readonly endColumn: number
-  ) {}
+    arg0: number | { line: number; character: number },
+    arg1: number | { line: number; character: number },
+    arg2?: number,
+    arg3?: number
+  ) {
+    if (typeof arg0 === 'number' && typeof arg1 === 'number') {
+      this.startLine = arg0
+      this.startColumn = arg1
+      this.endLine = arg2 ?? arg0
+      this.endColumn = arg3 ?? arg1
+    } else {
+      const a = arg0 as { line: number; character: number }
+      const b = arg1 as { line: number; character: number }
+      this.startLine = a.line
+      this.startColumn = a.character
+      this.endLine = b.line
+      this.endColumn = b.character
+    }
+  }
   get start() {
     return { line: this.startLine, character: this.startColumn }
   }
@@ -224,7 +242,25 @@ interface FakeTabChangeEvent {
 }
 
 class FakeThemeIcon {
+  constructor(readonly id: string, readonly color?: FakeThemeColor) {}
+}
+
+class FakeThemeColor {
   constructor(readonly id: string) {}
+}
+
+class FakeMarkdownString {
+  isTrusted = false
+  supportThemeIcons = false
+  constructor(public value: string = '') {}
+  appendText(text: string): this {
+    this.value += text
+    return this
+  }
+  appendMarkdown(md: string): this {
+    this.value += md
+    return this
+  }
 }
 
 const TreeItemCollapsibleState = {
@@ -247,6 +283,43 @@ class FakeTreeItem {
 }
 
 class FakeFileSystemError extends Error {}
+
+class FakePosition {
+  constructor(readonly line: number, readonly character: number) {}
+}
+
+const CodeActionKind = {
+  QuickFix: { value: 'quickfix' },
+} as const
+
+class FakeCodeAction {
+  edit?: FakeWorkspaceEdit
+  diagnostics?: FakeDiagnostic[]
+  isPreferred?: boolean
+  constructor(readonly title: string, readonly kind?: { value: string }) {}
+}
+
+interface FakeWorkspaceEditOp {
+  kind: 'replace' | 'insert' | 'createFile'
+  uri: FakeUri
+  range?: FakeRange
+  newText?: string
+  position?: FakePosition
+  options?: { ignoreIfExists?: boolean }
+}
+
+class FakeWorkspaceEdit {
+  readonly ops: FakeWorkspaceEditOp[] = []
+  replace(uri: FakeUri, range: FakeRange, newText: string): void {
+    this.ops.push({ kind: 'replace', uri, range, newText })
+  }
+  insert(uri: FakeUri, position: FakePosition, newText: string): void {
+    this.ops.push({ kind: 'insert', uri, position, newText })
+  }
+  createFile(uri: FakeUri, options?: { ignoreIfExists?: boolean }): void {
+    this.ops.push({ kind: 'createFile', uri, options })
+  }
+}
 
 interface FakeTextDocument {
   uri: FakeUri
@@ -344,6 +417,12 @@ export const vscodeMockModule = {
   Diagnostic: FakeDiagnostic,
   DiagnosticSeverity,
   ThemeIcon: FakeThemeIcon,
+  ThemeColor: FakeThemeColor,
+  MarkdownString: FakeMarkdownString,
+  Position: FakePosition,
+  CodeAction: FakeCodeAction,
+  CodeActionKind,
+  WorkspaceEdit: FakeWorkspaceEdit,
   TreeItem: FakeTreeItem,
   TreeItemCollapsibleState,
   TabInputText: FakeTabInputText,
@@ -432,6 +511,11 @@ export const vscodeMockModule = {
     },
     onDidChangeDiagnostics: ((listener: Listener<{ uris: readonly FakeUri[] }>) =>
       vscodeMockState.changeDiagnosticsEmitter.event(listener)),
+    registerCodeActionsProvider: (
+      _selector: unknown,
+      _provider: unknown,
+      _metadata?: unknown
+    ): { dispose: () => void } => ({ dispose: () => undefined }),
   },
 }
 
@@ -477,13 +561,16 @@ export function createFakeContext(): {
 
 export type { FakeTab, FakeTabChangeEvent, FakeTextDocument, FakeWorkspaceFolder }
 export {
+  FakeCodeAction,
   FakeDiagnostic,
   FakeDiagnosticCollection,
   FakeEventEmitter,
+  FakePosition,
   FakeRange,
   FakeTabInputNotebook,
   FakeTabInputNotebookDiff,
   FakeTabInputText,
   FakeTabInputTextDiff,
   FakeUri,
+  FakeWorkspaceEdit,
 }

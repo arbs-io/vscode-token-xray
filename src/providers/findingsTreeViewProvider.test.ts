@@ -160,6 +160,48 @@ describe('registerFindingsTreeViewProvider — wiring', () => {
     expect(fires).toBe(0)
   })
 
+  it('renders per-analyzer icons + severity-coloured badges on token roots', async () => {
+    const uri = FakeUri.file('/repo/leak.ts')
+    vscodeMockState.textDocuments.push(makeDoc(uri, SAMPLE_JWT))
+    addOpenTab(new FakeTabInputText(uri))
+    const provider = new FindingsTreeViewProvider()
+    provider.refresh()
+    const [root] = await getRoots(provider)
+    expect(root.kind).toBe('tokenRoot')
+
+    const item = provider.getTreeItem(root)
+    // The JWT analyzer should map to the `key` codicon. The fake
+    // ThemeIcon stores its id on `.id` and the colour on `.color`.
+    expect((item.iconPath as { id: string }).id).toBe('key')
+    // Description picks up the file location and (when present) a
+    // compact severity badge: "leak.ts:1 · 1W" etc.
+    expect(typeof item.description).toBe('string')
+    expect(item.description as string).toContain('leak.ts')
+  })
+
+  it('uses a recognised section icon for known section titles', async () => {
+    const uri = FakeUri.file('/repo/leak.ts')
+    vscodeMockState.textDocuments.push(makeDoc(uri, SAMPLE_JWT))
+    addOpenTab(new FakeTabInputText(uri))
+    const provider = new FindingsTreeViewProvider()
+    provider.refresh()
+    const [root] = await getRoots(provider)
+    const groups = (root.children ?? []).filter((c) => c.kind === 'sectionGroup')
+    const header = groups.find((g) => g.label.toLowerCase().includes('header'))
+    const claims = groups.find((g) => g.label.toLowerCase().includes('claims'))
+    expect(header).toBeDefined()
+    expect(claims).toBeDefined()
+
+    // "JOSE Header" matches the "jose" entry → symbol-namespace.
+    expect((provider.getTreeItem(header!).iconPath as { id: string }).id).toBe(
+      'symbol-namespace'
+    )
+    // "Claims" → symbol-property.
+    expect((provider.getTreeItem(claims!).iconPath as { id: string }).id).toBe(
+      'symbol-property'
+    )
+  })
+
   it('clears the pending debounced refresh on context disposal', () => {
     const ctx = makeContext()
     registerFindingsTreeViewProvider(ctx as never)

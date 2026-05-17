@@ -22,6 +22,8 @@ jobs:
         with:
           node-version: 20.x
       - run: npm install
+      - name: Verify (version + CHANGELOG match)
+        run: npm run check-version
       - name: Verify (typecheck)
         run: npm run typecheck
       - name: Verify (tests)

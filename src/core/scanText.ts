@@ -1,4 +1,5 @@
 import { AnalyzerRegistry } from './registry'
+import { looksBinary } from './binaryDetection'
 import {
   DiagnosticDto,
   DiagnosticsMetrics,
@@ -115,6 +116,13 @@ export async function scanText(
   }
 
   if (!text) {
+    emitMetrics(0, 0)
+    return []
+  }
+  // Binary buffers (PDFs, images, compiled artefacts that VS Code chose
+  // to surface as a TextDocument) produce nothing but high-entropy noise
+  // — skip them before paying the regex cost.
+  if (looksBinary(text)) {
     emitMetrics(0, 0)
     return []
   }

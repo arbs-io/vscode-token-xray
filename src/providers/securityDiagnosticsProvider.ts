@@ -37,6 +37,7 @@ const SEVERITY_MAP: Record<DiagnosticDto['severity'], DiagnosticSeverity> = {
 // open/change/close events for it, so no separate notebook listener is needed.
 const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell'])
 const IGNORE_FILE_NAME = '.tokenxrayignore'
+const GITIGNORE_FILE_NAME = '.gitignore'
 
 /**
  * Recover the parent `.ipynb` file path from a `vscode-notebook-cell` URI.
@@ -129,26 +130,46 @@ function relativeFor(
 }
 
 /**
- * Load + parse the `.tokenxrayignore` file at the root of `folder`,
- * returning the active pattern list (or `[]` when no file exists).
- *
- * Any I/O error other than "file not found" is swallowed so the
- * provider keeps working even if the file is unreadable; the cache
- * entry simply falls back to an empty pattern list.
+ * Read a single ignore file at the root of `folder` and return its
+ * parsed pattern list. Missing or unreadable files yield `[]` so the
+ * caller can merge multiple sources without per-file error handling.
  */
-async function loadIgnorePatterns(folder: WorkspaceFolder): Promise<string[]> {
-  const uri = Uri.joinPath(folder.uri, IGNORE_FILE_NAME)
+async function loadPatternsFromFile(
+  folder: WorkspaceFolder,
+  fileName: string
+): Promise<string[]> {
+  const uri = Uri.joinPath(folder.uri, fileName)
   try {
     const bytes = await workspace.fs.readFile(uri)
     const text = new TextDecoder('utf-8').decode(bytes)
     return parseIgnoreFile(text)
   } catch (err) {
-    // FileNotFound is the common case (no .tokenxrayignore in the
-    // workspace). We treat any read failure as "no patterns" rather
-    // than surfacing an error — this is a best-effort feature.
     if (err instanceof FileSystemError) return []
     return []
   }
+}
+
+/**
+ * Active ignore-pattern set for a workspace folder. Always includes
+ * `.tokenxrayignore`; also folds in workspace-root `.gitignore` when
+ * `tokenXray.respectGitignore` is true (the default). Most projects
+ * already gitignore `.env*`, `secrets/`, `*.pem`, etc. — honouring
+ * those by default avoids noisy diagnostics on files the user has
+ * already declared off-limits.
+ *
+ * We deliberately read only the root `.gitignore`; nested .gitignores
+ * would require walking the file tree and re-resolving every scan.
+ */
+async function loadIgnorePatterns(folder: WorkspaceFolder): Promise<string[]> {
+  const tokenXrayPatterns = await loadPatternsFromFile(folder, IGNORE_FILE_NAME)
+  const config = workspace.getConfiguration('tokenXray', folder.uri)
+  const respectGitignore = config.get<boolean>('respectGitignore', true)
+  if (!respectGitignore) return tokenXrayPatterns
+  const gitignorePatterns = await loadPatternsFromFile(folder, GITIGNORE_FILE_NAME)
+  // .gitignore patterns come first so a later `.tokenxrayignore` entry
+  // (including `!negations`) can override them — matches gitignore's
+  // "last matching rule wins" semantics.
+  return [...gitignorePatterns, ...tokenXrayPatterns]
 }
 
 /**
@@ -170,11 +191,28 @@ function formatScanSummary(label: string, metrics: ScanTextMetrics): string {
   return `${label}: scanned ${metrics.scanned} tokens, suppressed ${suppressed} (${metrics.droppedBySecretsFilter} secrets / ${ignored} ignored)`
 }
 
-export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
+/**
+ * Trailing-edge debounce window for `onDidChangeTextDocument` events.
+ * Tuned so a typing burst (one keystroke per ~70ms) resolves to a single
+ * trailing scan once the user pauses. Open/close events bypass this and
+ * still scan immediately so the Problems panel populates without lag.
+ */
+const CHANGE_DEBOUNCE_MS = 250
+
+export interface DiagnosticsProviderOptions {
+  /** Overrides {@link CHANGE_DEBOUNCE_MS}. Set to 0 in tests for sync behaviour. */
+  changeDebounceMs?: number
+}
+
+export function registerSecurityDiagnosticsProvider(
+  context: ExtensionContext,
+  options: DiagnosticsProviderOptions = {}
+) {
   const registry = createDefaultRegistry()
   const collection = languages.createDiagnosticCollection('tokenXray')
   context.subscriptions.push(collection)
   const debugLog = getDebugLogger(context)
+  const changeDebounceMs = options.changeDebounceMs ?? CHANGE_DEBOUNCE_MS
 
   // Per-workspace-folder pattern cache. Refreshed on startup and any
   // time files in the workspace change so adding / editing / deleting
@@ -306,10 +344,38 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     refreshAll()
   }
 
+  // Per-URI debounce timers for change events. A keystroke fires
+  // `onDidChangeTextDocument` per character — scanning every one wastes
+  // CPU on large files. We coalesce into a single trailing scan; if a
+  // newer change arrives during the wait, the existing timer is reset
+  // so only the final pause triggers a scan.
+  const changeTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const clearChangeTimer = (uriKey: string) => {
+    const t = changeTimers.get(uriKey)
+    if (t) {
+      clearTimeout(t)
+      changeTimers.delete(uriKey)
+    }
+  }
+  const scheduleChange = (doc: TextDocument) => {
+    if (changeDebounceMs <= 0) {
+      void refresh(doc)
+      return
+    }
+    const key = doc.uri.toString()
+    clearChangeTimer(key)
+    const timer = setTimeout(() => {
+      changeTimers.delete(key)
+      void refresh(doc)
+    }, changeDebounceMs)
+    changeTimers.set(key, timer)
+  }
+
   context.subscriptions.push(
     workspace.onDidOpenTextDocument((doc) => void refresh(doc)),
-    workspace.onDidChangeTextDocument((e) => void refresh(e.document)),
+    workspace.onDidChangeTextDocument((e) => scheduleChange(e.document)),
     workspace.onDidCloseTextDocument((doc) => {
+      clearChangeTimer(doc.uri.toString())
       invalidateScan(doc.uri)
       collection.delete(doc.uri)
     }),
@@ -324,6 +390,7 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
       for (const key of Array.from(scanTokens.keys())) {
         const uri = Uri.parse(key)
         if (!openTabs.has(effectiveTabUri(uri).toString())) {
+          clearChangeTimer(key)
           scanTokens.delete(key)
         }
       }
@@ -334,6 +401,10 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
       })
     }),
     workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('tokenXray.respectGitignore')) {
+        void refreshOnIgnoreEvent()
+        return
+      }
       if (
         !e.affectsConfiguration('tokenXray.secrets') &&
         !e.affectsConfiguration('tokenXray.ruleSeverity')
@@ -349,7 +420,15 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     // not onDidCreateFiles, so we hook that path too.
     workspace.onDidSaveTextDocument((doc) => {
       const base = doc.uri.path.split('/').pop()
-      if (base === IGNORE_FILE_NAME) void refreshOnIgnoreEvent()
-    })
+      if (base === IGNORE_FILE_NAME || base === GITIGNORE_FILE_NAME) {
+        void refreshOnIgnoreEvent()
+      }
+    }),
+    {
+      dispose: () => {
+        for (const t of changeTimers.values()) clearTimeout(t)
+        changeTimers.clear()
+      },
+    }
   )
 }

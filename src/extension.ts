@@ -1,4 +1,5 @@
-import { ExtensionContext } from 'vscode'
+import { ExtensionContext, workspace } from 'vscode'
+import { keySourcesFromConfigDetailed } from './analyzers/jwt/keyLoader'
 import { registerInspectCommand } from './contexts/registerInspectCommand'
 import { registerShowClaimsetPreviewCommand } from './contexts/registerShowClaimsetPreviewCommand'
 import { registerShowJsonPreviewCommand } from './contexts/registerShowJsonPreviewCommand'
@@ -22,13 +23,19 @@ export function activate(context: ExtensionContext) {
   // `getDebugLogger`. The channel itself is registered as a
   // disposable on the extension context; the logger is a no-op until
   // the user enables `tokenXray.debug`.
-  registerDebugOutputChannel(context)
+  const debugLog = registerDebugOutputChannel(context)
 
   // Single per-activation scan cache. Each `(uri, version)` pair is
   // tokenised + analyzed at most once even when several providers
   // consume the result. The lifecycle helper drops entries when docs
   // or tabs close so closed-and-reopened files are scanned fresh.
-  const scanCache = new ScanCache()
+  const scanCache = new ScanCache({
+    onError: (where, analyzerId, err) => {
+      const detail = err instanceof Error ? err.message : String(err)
+      const label = analyzerId ? `${where}[${analyzerId}]` : where
+      debugLog(`ScanCache ${label} failed: ${detail}`)
+    },
+  })
   registerScanCacheLifecycle(context, scanCache)
 
   // Generic, content-driven analysis — works on any open document.
@@ -47,4 +54,23 @@ export function activate(context: ExtensionContext) {
   registerHoverProvider(context)
   registerShowClaimsetPreviewCommand(context)
   registerShowJsonPreviewCommand(context)
+
+  // Validate `tokenXray.jwt.keys` and surface any malformed entries through
+  // the debug output channel. Without this the user has no signal when
+  // settings.json contains a typo (entries are silently dropped at
+  // verification time). We re-check whenever the user edits the setting so
+  // feedback is immediate.
+  const reportKeyConfigIssues = () => {
+    const config = workspace.getConfiguration('tokenXray.jwt')
+    const { issues } = keySourcesFromConfigDetailed(config.get<unknown[]>('keys', []))
+    for (const issue of issues) {
+      debugLog(`tokenXray.jwt.keys[${issue.index}] ignored: ${issue.reason}`)
+    }
+  }
+  reportKeyConfigIssues()
+  context.subscriptions.push(
+    workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('tokenXray.jwt.keys')) reportKeyConfigIssues()
+    })
+  )
 }

@@ -3,7 +3,7 @@
 All notable changes to Token X-Ray are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
-## [2.0.0] — 2026-05-17
+## [1.2.0] — 2026-05-17
 
 ### Added — Token & cryptographic formats
 
@@ -79,10 +79,21 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - Renamed from "JWT Decoder" to "Token X-Ray"
 - Repository moved to `vscode-token-xray`; `package.json` `repository.url` updated to match the new git remote
+- Findings tree view: every analyzer kind now has its own codicon (key, shield, verified, lock, cloud, gist-secret, terminal, …) tinted to the worst severity. Section groups (`JOSE Header`, `Claims`, `Certificate`, `Subject & Key`, etc.) gained per-title icons; finding rows show a coloured severity icon and a compact `1E 2W 3I` badge on the parent token row.
+- Tightened the JWT claimset webview CSP — `img-src` now restricted to `cspSource + data:` (was `*`); `style-src 'unsafe-inline'` retained intentionally for the React inline-style tree and documented in-source.
+- Marketplace metadata: added `keywords` and moved `categories` to `["Linters","Other"]` so the listing surfaces on security/linter searches.
+
+### Added (1.2)
+
+- **`tokenXray.respectGitignore`** (default `true`) — workspace-root `.gitignore` patterns are merged with `.tokenxrayignore` so gitignored files (e.g. `.env`, `secrets/`) are skipped by every analyzer.
+- Per-document trailing-edge debounce on `onDidChangeTextDocument` (250ms) so a typing burst resolves to a single trailing scan instead of one scan per keystroke.
+- Binary-content short-circuit: any document containing a NUL byte in the first 8 KiB is skipped by both the cache and the diagnostics pass, eliminating high-entropy noise on accidentally-opened binaries.
+- `ScanCache` now exposes an optional `onError` callback wired to the debug output channel — analyzer-thrown errors are no longer silently swallowed when `tokenXray.debug` is on.
+- `tokenXray.jwt.keys` entries that don't parse as a recognised shape are reported via the debug channel with the offending index + reason (was silently dropped).
 
 ### Infrastructure
 
-- Vitest test suite (1672+ tests, 90/85/90/90 statements/branches/functions/lines coverage thresholds enforced)
-- GitHub Actions workflow (`.github/workflows/vsix-package.yaml`) runs `npm run typecheck` and `npm run test` on every matrix OS (macos / ubuntu / windows) before `vsce package` produces an artifact
+- Vitest test suite (1739+ tests, 90/85/90/90 statements/branches/functions/lines coverage thresholds enforced); new coverage for `secretCodeActionsProvider`, change-event debouncing, binary detection, and the JWT key-loader's issue-reporting surface.
+- GitHub Actions workflow (`.github/workflows/vsix-package.yaml`) runs `npm run check-version`, `npm run typecheck`, and `npm run test` on every matrix OS (macos / ubuntu / windows) before `vsce package` produces an artifact. The new `check-version` script also runs in `vscode:prepublish` so a CHANGELOG/version mismatch can't ship locally either.
 
-[2.0.0]: https://github.com/arbs-io/vscode-token-xray/releases/tag/v2.0.0
+[1.2.0]: https://github.com/arbs-io/vscode-token-xray/releases/tag/v1.2.0

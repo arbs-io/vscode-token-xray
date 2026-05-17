@@ -147,7 +147,10 @@ describe('refresh — scan cancellation', () => {
     const second = deferred<DiagnosticDto[]>()
     scanTextMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
 
-    registerSecurityDiagnosticsProvider(makeContext() as never)
+    // Disable change debouncing so the synthetic change event flushes
+    // synchronously — production uses a 250ms trailing edge that this
+    // test isn't exercising.
+    registerSecurityDiagnosticsProvider(makeContext() as never, { changeDebounceMs: 0 })
     await Promise.resolve()
 
     // Fire a change to trigger a second refresh while the first is in
@@ -166,6 +169,57 @@ describe('refresh — scan cancellation', () => {
     second.resolve([makeDto('jwt.fresh')])
     await new Promise((r) => setImmediate(r))
     expect(getCollection().get(uri)?.[0].code).toBe('jwt.fresh')
+  })
+})
+
+describe('refresh — change debounce', () => {
+  it('coalesces a burst of change events into a single scan on the trailing edge', async () => {
+    vi.useFakeTimers()
+    const uri = FakeUri.file('/repo/typing.ts')
+    vscodeMockState.textDocuments.push(makeDoc(uri, 'x'))
+    addOpenTab(new FakeTabInputText(uri))
+    scanTextMock.mockResolvedValue([])
+
+    registerSecurityDiagnosticsProvider(makeContext() as never, { changeDebounceMs: 250 })
+    // Open-time scan runs immediately — drain pending microtasks so we
+    // observe a clean baseline before firing the burst.
+    await vi.advanceTimersByTimeAsync(0)
+    const baseline = scanTextMock.mock.calls.length
+
+    for (let i = 0; i < 5; i++) {
+      vscodeMockState.changeTextDocEmitter.fire({ document: makeDoc(uri, `y${i}`) })
+      await vi.advanceTimersByTimeAsync(50)
+    }
+    // Halfway through the debounce window — still no extra scan.
+    expect(scanTextMock.mock.calls.length).toBe(baseline)
+
+    await vi.advanceTimersByTimeAsync(250)
+    expect(scanTextMock.mock.calls.length).toBe(baseline + 1)
+  })
+
+  it('cancels a pending debounced scan when the tab closes', async () => {
+    vi.useFakeTimers()
+    const uri = FakeUri.file('/repo/typing.ts')
+    vscodeMockState.textDocuments.push(makeDoc(uri, 'x'))
+    addOpenTab(new FakeTabInputText(uri))
+    scanTextMock.mockResolvedValue([])
+
+    registerSecurityDiagnosticsProvider(makeContext() as never, { changeDebounceMs: 250 })
+    await vi.advanceTimersByTimeAsync(0)
+    const baseline = scanTextMock.mock.calls.length
+
+    vscodeMockState.changeTextDocEmitter.fire({ document: makeDoc(uri, 'y') })
+
+    // Tab closes before the debounce fires; pending scan must be canceled.
+    vscodeMockState.tabGroups.length = 0
+    vscodeMockState.changeTabsEmitter.fire({
+      opened: [],
+      closed: [{ label: 'typing', input: undefined }],
+      changed: [],
+    })
+
+    await vi.advanceTimersByTimeAsync(500)
+    expect(scanTextMock.mock.calls.length).toBe(baseline)
   })
 })
 
