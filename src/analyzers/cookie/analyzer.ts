@@ -30,8 +30,10 @@ export class CookieAnalyzer implements Analyzer {
     if (cookie.attributes.maxAge !== undefined) {
       rows.push({ key: 'maxAge', value: cookie.attributes.maxAge, description: 'Max-Age (seconds)' })
     }
-    rows.push({ key: 'secure', value: String(cookie.attributes.secure), description: 'Secure attribute' })
-    rows.push({ key: 'httpOnly', value: String(cookie.attributes.httpOnly), description: 'HttpOnly attribute' })
+    rows.push(
+      { key: 'secure', value: String(cookie.attributes.secure), description: 'Secure attribute' },
+      { key: 'httpOnly', value: String(cookie.attributes.httpOnly), description: 'HttpOnly attribute' },
+    )
     if (cookie.attributes.sameSite) {
       rows.push({ key: 'sameSite', value: cookie.attributes.sameSite, description: 'SameSite policy' })
     }
@@ -50,7 +52,7 @@ export class CookieAnalyzer implements Analyzer {
   }
 }
 
-function pushAttr(rows: SectionRow[], key: keyof ParsedCookie['attributes'] & string, value: string | undefined, description: string) {
+function pushAttr(rows: SectionRow[], key: keyof ParsedCookie['attributes'], value: string | undefined, description: string) {
   if (value !== undefined && value !== '') {
     rows.push({ key, value, description })
   }
