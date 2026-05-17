@@ -42,11 +42,12 @@ export async function augmentWithVerification(
 ): Promise<JwtPanelPayload> {
   if (payload.kind !== 'JWS' || keys.length === 0) return payload
   const result = await verifyJwt(token, { keys, issuer: options.issuer, audience: options.audience })
+  const kidSuffix = result.matchedKeyKid ? ` (kid: ${result.matchedKeyKid})` : ''
   const finding: Finding = result.verified
     ? {
         id: 'jwt.signature.verified',
         severity: 'info',
-        message: `Signature verified with ${result.alg}${result.matchedKeyKid ? ` (kid: ${result.matchedKeyKid})` : ''}.`,
+        message: `Signature verified with ${result.alg}${kidSuffix}.`,
       }
     : {
         id: 'jwt.signature.invalid',
