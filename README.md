@@ -10,24 +10,24 @@
 
 Token X-Ray runs a registry of pure analyzers over every open document. Findings surface as **diagnostics** in the Problems panel, as **code lenses** above the matching lines (`Inspect`), as **hover previews**, as **inlay hints**, in a dedicated **Findings** view in the activity bar, on the **status bar**, and — for JWTs — in a dedicated **claimset viewer**.
 
-| Analyzer | Surface |
-| --- | --- |
-| **JWT / JWS / JWE** | Decoded header + claimset, semantic highlighting, signature verification, expiry / audience / issuer checks, JWE shape detection |
-| **PASETO** | v1–v4 detection; deprecation hint on v1/v2; encrypted-payload notice on `local` purpose |
-| **SAML assertions** | XML / base64 / DEFLATE+base64 decoding, Issuer, NameID, Conditions, AudienceRestriction, signature presence, encrypted-assertion detection |
-| **SAML 2.0 metadata** | `EntityDescriptor` / `EntitiesDescriptor` parsing, IdP/SP role, NameIDFormats, ACS URLs, signing-cert expiry |
-| **X.509 certificates** | PEM and base64-DER (`.cer` / `.crt`) decoding via Node's built-in `X509Certificate`; expired / weak-key / SHA-1 / self-signed / missing-SAN findings |
-| **CSR** | `CERTIFICATE REQUEST` PEM blocks — subject, requested SANs, weak-key finding |
-| **JWK / JWKS** | `kty` / `alg` / `kid` / `use` / key size; weak-key, deprecated-curve, private-material exposure, missing-`kid` findings |
-| **OpenSSH public keys** | `ssh-rsa` / `ssh-ed25519` / `ecdsa-sha2-nistpXXX` / `ssh-dss`; weak DSA + weak RSA findings |
-| **OpenPGP** | Armored block detection (public / private / signature / message / signed-message); private-key-present and encrypted-message findings |
-| **OIDC discovery** | `.well-known/openid-configuration` JSON — supported algs, scopes, endpoints; `alg=none`, weak HS256, non-HTTPS endpoint findings |
-| **HTTP signatures** | Cavage draft and RFC 9421 — keyId, algorithm, covered components, signature; weak algorithm + future-`created` findings |
-| **HTTP Basic auth** | `Authorization: Basic <base64>` + labelled credential pairs — decoded username, masked password, plaintext-credential finding |
-| **AWS SigV4 headers** | `AWS4-HMAC-SHA256 Credential=…` — access key id, region, service; exposed-access-key + missing-host finding |
+| Analyzer                | Surface                                                                                                                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **JWT / JWS / JWE**     | Decoded header + claimset, semantic highlighting, signature verification, expiry / audience / issuer checks, JWE shape detection                                              |
+| **PASETO**              | v1–v4 detection; deprecation hint on v1/v2; encrypted-payload notice on `local` purpose                                                                                       |
+| **SAML assertions**     | XML / base64 / DEFLATE+base64 decoding, Issuer, NameID, Conditions, AudienceRestriction, signature presence, encrypted-assertion detection                                    |
+| **SAML 2.0 metadata**   | `EntityDescriptor` / `EntitiesDescriptor` parsing, IdP/SP role, NameIDFormats, ACS URLs, signing-cert expiry                                                                  |
+| **X.509 certificates**  | PEM and base64-DER (`.cer` / `.crt`) decoding via Node's built-in `X509Certificate`; expired / weak-key / SHA-1 / self-signed / missing-SAN findings                          |
+| **CSR**                 | `CERTIFICATE REQUEST` PEM blocks — subject, requested SANs, weak-key finding                                                                                                  |
+| **JWK / JWKS**          | `kty` / `alg` / `kid` / `use` / key size; weak-key, deprecated-curve, private-material exposure, missing-`kid` findings                                                       |
+| **OpenSSH public keys** | `ssh-rsa` / `ssh-ed25519` / `ecdsa-sha2-nistpXXX` / `ssh-dss`; weak DSA + weak RSA findings                                                                                   |
+| **OpenPGP**             | Armored block detection (public / private / signature / message / signed-message); private-key-present and encrypted-message findings                                         |
+| **OIDC discovery**      | `.well-known/openid-configuration` JSON — supported algs, scopes, endpoints; `alg=none`, weak HS256, non-HTTPS endpoint findings                                              |
+| **HTTP signatures**     | Cavage draft and RFC 9421 — keyId, algorithm, covered components, signature; weak algorithm + future-`created` findings                                                       |
+| **HTTP Basic auth**     | `Authorization: Basic <base64>` + labelled credential pairs — decoded username, masked password, plaintext-credential finding                                                 |
+| **AWS SigV4 headers**   | `AWS4-HMAC-SHA256 Credential=…` — access key id, region, service; exposed-access-key + missing-host finding                                                                   |
 | **OAuth opaque tokens** | Vendor token recognition: GitHub (`ghp_`, `ghs_`, `gho_`, `ghu_`, `ghr_`, `github_pat_`), Slack (`xox[bpoars]-`), Stripe (`sk_live_` / `pk_test_` / etc.) with severity tiers |
-| **Cookies** | RFC 6265 `Set-Cookie` parsing — missing `Secure` / `HttpOnly`, `SameSite=None` without `Secure`, no expiry, JWT-as-cookie, public-suffix `Domain` |
-| **Secrets** | 90+ inline credential rules across any text file — see below |
+| **Cookies**             | RFC 6265 `Set-Cookie` parsing — missing `Secure` / `HttpOnly`, `SameSite=None` without `Secure`, no expiry, JWT-as-cookie, public-suffix `Domain`                             |
+| **Secrets**             | 90+ inline credential rules across any text file — see below                                                                                                                  |
 
 ### Issuer recognition
 
@@ -42,22 +42,22 @@ When a JWT or OIDC config exposes an `iss`, Token X-Ray annotates the recognized
 
 90+ vendor-specific secret rules ship out of the box. Hits report exact byte ranges so VS Code renders them as diagnostics on the precise characters.
 
-| Category | Vendors |
-| --- | --- |
-| **Cloud platforms** | AWS, Azure, GCP, Cloudflare, DigitalOcean, Heroku |
-| **Identity** | Okta, Auth0, SailPoint, Cloudflare Access |
-| **AI providers** | OpenAI, Anthropic, Hugging Face, Replicate |
-| **Databases** | Postgres, MySQL, MongoDB, Redis, JDBC connection strings with embedded passwords |
-| **Secrets management** | HashiCorp Vault, Terraform Cloud |
-| **Source forges** | GitHub, GitLab, Atlassian (Jira / Confluence) |
-| **Communications** | Twilio, SendGrid, Mailgun, Telegram, Discord |
-| **Observability** | Datadog, New Relic, Sentry, PagerDuty |
-| **Package registries** | npm, NuGet, PyPI, Docker Hub, JFrog Artifactory |
-| **CI/CD** | CircleCI, Buildkite, Codecov |
-| **Payments** | Square, PayPal |
-| **Productivity** | Notion, Linear, Figma, Postman, Asana, Monday |
-| **Misc** | Mapbox, Algolia, Snyk |
-| **Generic** | PEM private keys, high-entropy strings, JWT-as-env-value |
+| Category               | Vendors                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| **Cloud platforms**    | AWS, Azure, GCP, Cloudflare, DigitalOcean, Heroku                                |
+| **Identity**           | Okta, Auth0, SailPoint, Cloudflare Access                                        |
+| **AI providers**       | OpenAI, Anthropic, Hugging Face, Replicate                                       |
+| **Databases**          | Postgres, MySQL, MongoDB, Redis, JDBC connection strings with embedded passwords |
+| **Secrets management** | HashiCorp Vault, Terraform Cloud                                                 |
+| **Source forges**      | GitHub, GitLab, Atlassian (Jira / Confluence)                                    |
+| **Communications**     | Twilio, SendGrid, Mailgun, Telegram, Discord                                     |
+| **Observability**      | Datadog, New Relic, Sentry, PagerDuty                                            |
+| **Package registries** | npm, NuGet, PyPI, Docker Hub, JFrog Artifactory                                  |
+| **CI/CD**              | CircleCI, Buildkite, Codecov                                                     |
+| **Payments**           | Square, PayPal                                                                   |
+| **Productivity**       | Notion, Linear, Figma, Postman, Asana, Monday                                    |
+| **Misc**               | Mapbox, Algolia, Snyk                                                            |
+| **Generic**            | PEM private keys, high-entropy strings, JWT-as-env-value                         |
 
 Most rules mark a `sensitiveSpan` over just the secret value so the surrounding env var name / URL remains readable in diagnostics.
 
@@ -71,21 +71,23 @@ Every decoder, parser, and rule runs locally in the extension host. **No tokens,
 
 The claimset viewer renders each claim with its registered meaning (RFC 7519 + common public claims), IdP-specific annotations, and a findings banner (red / yellow / blue) at the top. Open it from the `Inspect` code lens above any detected token, the right-click menu, or the `Token X-Ray: Show rendered claimset` command.
 
-![Claimset viewer](images/showClaimsetPreviewCommand.png)
+![Claimset viewer](images/screenshot/vscode-token-xray-analysis.png)
 
 ### Findings activity-bar view
 
 A dedicated **Token X-Ray** view container in the activity bar lists every detected token across open documents as an outline — analyzer kind, file:line, decoded sections, and findings. Click any node to reveal the source location.
 
 <!-- TODO: capture screenshot — activity bar Findings tree expanded with a few token roots (JWT / x509 / secret) and their Header / Claims / Findings sub-nodes -->
-![Findings tree](images/findings-treeview.png)
+
+![Findings tree](images/screenshot/vscode-token-xray-treeview.png)
 
 ### Diagnostics in the Problems panel
 
 All findings stream into the Problems panel under the `tokenXray` source — errors / warnings / info entries with the rule id as the diagnostic code — so detections participate in your normal review flow.
 
 <!-- TODO: capture screenshot — Problems panel filtered to source: tokenXray with mixed errors / warnings / info entries -->
-![Diagnostics in Problems panel](images/diagnostics.png)
+
+![Diagnostics in Problems panel](images/screenshot/vscode-token-xray-problems.png)
 
 ### Other surfaces
 
@@ -100,11 +102,11 @@ All findings stream into the Problems panel under the `tokenXray` source — err
 
 ## Commands
 
-| Command | Action |
-| --- | --- |
-| `Token X-Ray: Inspect token` | Inspect the token at the cursor (or the lens-triggered range) |
-| `Token X-Ray: Show rendered claimset` | Open the claimset viewer for the active JWT |
-| `Token X-Ray: Show token as decoded JSON` | Open the decoded payload as a regular JSON document |
+| Command                                   | Action                                                        |
+| ----------------------------------------- | ------------------------------------------------------------- |
+| `Token X-Ray: Inspect token`              | Inspect the token at the cursor (or the lens-triggered range) |
+| `Token X-Ray: Show rendered claimset`     | Open the claimset viewer for the active JWT                   |
+| `Token X-Ray: Show token as decoded JSON` | Open the decoded payload as a regular JSON document           |
 
 The two preview commands are also available as title-bar buttons when the editor language is `jwt`.
 
@@ -150,19 +152,19 @@ Tune individual rule severities (or turn rules off entirely) via the `tokenXray.
 
 ## Configuration
 
-| Setting | Default | Purpose |
-| --- | --- | --- |
-| `tokenXray.jwt.verifySignature` | `false` | Run signature verification in the claimset viewer |
-| `tokenXray.jwt.expectedIssuer` | `""` | If set, also assert `iss` equals this value |
-| `tokenXray.jwt.expectedAudience` | `""` | If set, also assert `aud` equals this value |
-| `tokenXray.jwt.keys` | `[]` | Verification keys — JWK objects, `{ pem, alg, kid? }`, or `{ secret, alg, kid? }` for HMAC |
-| `tokenXray.secrets.enabled` | `true` | Master switch for secret-rule findings |
-| `tokenXray.secrets.exclude` | `[]` | Glob patterns to skip secret scanning for (independent of `.tokenxrayignore`) |
-| `tokenXray.secrets.maxFileSizeBytes` | `1048576` | Skip secret scanning on documents larger than this (1 MiB default) |
-| `tokenXray.secrets.codeActions.enabled` | `true` | Enable the Redact / Move-to-.env quick fixes |
-| `tokenXray.inlayHints.enabled` | `true` | Show inline expiry / severity hints next to tokens |
-| `tokenXray.ruleSeverity` | `{}` | Per-rule severity overrides (`error` / `warning` / `info` / `off`) |
-| `tokenXray.debug` | `false` | Log scan counts and suppressions to the Token X-Ray output channel |
+| Setting                                 | Default   | Purpose                                                                                    |
+| --------------------------------------- | --------- | ------------------------------------------------------------------------------------------ |
+| `tokenXray.jwt.verifySignature`         | `false`   | Run signature verification in the claimset viewer                                          |
+| `tokenXray.jwt.expectedIssuer`          | `""`      | If set, also assert `iss` equals this value                                                |
+| `tokenXray.jwt.expectedAudience`        | `""`      | If set, also assert `aud` equals this value                                                |
+| `tokenXray.jwt.keys`                    | `[]`      | Verification keys — JWK objects, `{ pem, alg, kid? }`, or `{ secret, alg, kid? }` for HMAC |
+| `tokenXray.secrets.enabled`             | `true`    | Master switch for secret-rule findings                                                     |
+| `tokenXray.secrets.exclude`             | `[]`      | Glob patterns to skip secret scanning for (independent of `.tokenxrayignore`)              |
+| `tokenXray.secrets.maxFileSizeBytes`    | `1048576` | Skip secret scanning on documents larger than this (1 MiB default)                         |
+| `tokenXray.secrets.codeActions.enabled` | `true`    | Enable the Redact / Move-to-.env quick fixes                                               |
+| `tokenXray.inlayHints.enabled`          | `true`    | Show inline expiry / severity hints next to tokens                                         |
+| `tokenXray.ruleSeverity`                | `{}`      | Per-rule severity overrides (`error` / `warning` / `info` / `off`)                         |
+| `tokenXray.debug`                       | `false`   | Log scan counts and suppressions to the Token X-Ray output channel                         |
 
 ## Architecture
 
