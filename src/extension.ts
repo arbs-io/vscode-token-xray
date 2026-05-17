@@ -2,6 +2,7 @@ import { ExtensionContext } from 'vscode'
 import { registerInspectCommand } from './contexts/registerInspectCommand'
 import { registerShowClaimsetPreviewCommand } from './contexts/registerShowClaimsetPreviewCommand'
 import { registerShowJsonPreviewCommand } from './contexts/registerShowJsonPreviewCommand'
+import { registerDocumentLinksProvider } from './providers/documentLinksProvider'
 import { registerDocumentSemanticTokensProvider } from './providers/documentSemanticTokensProvider'
 import { registerHoverProvider } from './providers/hoverProvider'
 import { registerInlayHintsProvider } from './providers/inlayHintsProvider'
@@ -15,6 +16,7 @@ export function activate(context: ExtensionContext) {
   registerSecurityDiagnosticsProvider(context)
   registerSecretCodeActionsProvider(context)
   registerInlayHintsProvider(context)
+  registerDocumentLinksProvider(context)
   registerInspectCommand(context)
 
   // JWT-specific glue for the existing `jwt` language id (semantic colours, hover, title-bar buttons).
