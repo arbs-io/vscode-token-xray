@@ -54,7 +54,7 @@ describe('decodeSamlMetadata', () => {
     if (!decoded) throw new Error('expected defined')
     expect(decoded.rootKind).toBe('EntitiesDescriptor')
     expect(decoded.entities).toHaveLength(2)
-    const kinds = decoded.entities.flatMap((e) => e.roles.map((r) => r.kind)).sort()
+    const kinds = decoded.entities.flatMap((e) => e.roles.map((r) => r.kind)).sort((a, b) => a.localeCompare(b))
     expect(kinds).toEqual(['IdP', 'SP'])
     const idp = decoded.entities.find((e) => e.entityId === 'https://idp.example.test/')!
     expect(idp.signed).toBe(true)
@@ -111,7 +111,7 @@ describe('decodeSamlMetadata', () => {
     </md:EntityDescriptor>`
     const decoded = decodeSamlMetadata(xml)
     if (!decoded) throw new Error('expected defined')
-    const kinds = decoded.entities[0].roles.map((r) => r.kind).sort()
+    const kinds = decoded.entities[0].roles.map((r) => r.kind).sort((a, b) => a.localeCompare(b))
     expect(kinds).toEqual(['IdP', 'SP'])
   })
 

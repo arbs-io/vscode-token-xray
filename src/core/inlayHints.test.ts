@@ -293,8 +293,8 @@ describe('findingsToInlayDtos', () => {
         }),
         HIT_RANGE
       )
-      const labels = dtos.map((d) => d.label).sort()
-      expect(labels).toEqual(['[RSA-512]', '[expired]'])
+      const labels = dtos.map((d) => d.label).sort((a, b) => a.localeCompare(b))
+      expect(labels).toEqual(['[expired]', '[RSA-512]'])
     })
 
     it('falls back to parsing bits from the finding message when keyDetails is absent', () => {

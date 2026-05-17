@@ -327,7 +327,7 @@ describe('COMMS_SECRET_RULES — coverage', () => {
   })
 
   it('exposes the expected rule ids', () => {
-    const ids = COMMS_SECRET_RULES.map((r) => r.id).sort()
+    const ids = COMMS_SECRET_RULES.map((r) => r.id).sort((a, b) => a.localeCompare(b))
     expect(ids).toEqual([
       'secret.discord.botToken',
       'secret.mailgun.apiKey',

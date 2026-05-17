@@ -78,7 +78,7 @@ describe('buildTree', () => {
         makeEntry({ analyzerId: 'jwt', finding: makeFinding({ id: 'jwt.c' }) }),
       ])
       expect(result).toHaveLength(2)
-      const ids = result.map((r) => r.analyzerId).sort()
+      const ids = result.map((r) => r.analyzerId).sort((a, b) => a.localeCompare(b))
       expect(ids).toEqual(['jwt', 'secret'])
     })
 

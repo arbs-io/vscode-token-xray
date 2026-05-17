@@ -415,7 +415,7 @@ describe('MISC_SECRET_RULES — coverage', () => {
   })
 
   it('exposes the expected rule ids', () => {
-    const ids = MISC_SECRET_RULES.map((r) => r.id).sort()
+    const ids = MISC_SECRET_RULES.map((r) => r.id).sort((a, b) => a.localeCompare(b))
     expect(ids).toEqual([
       'secret.algolia.adminKeyLabelled',
       'secret.digitalocean.personalAccessToken',

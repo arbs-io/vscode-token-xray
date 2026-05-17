@@ -61,7 +61,7 @@ describe('evaluatePaseto', () => {
 
   it('stacks deprecated + local findings on a v2.local token', () => {
     const findings = evaluatePaseto(decoded({ version: 'v2', purpose: 'local' }))
-    const ids = findings.map((f) => f.id).sort()
+    const ids = findings.map((f) => f.id).sort((a, b) => a.localeCompare(b))
     expect(ids).toEqual(['paseto.purpose.local', 'paseto.version.deprecated'])
   })
 

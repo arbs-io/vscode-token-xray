@@ -35,7 +35,7 @@ describe('AnalyzerRegistry', () => {
     r.register(fakeAnalyzer('a', /a/))
     r.register(fakeAnalyzer('b', /b/))
     const matches = r.detectAll('a b')
-    expect(matches.map((m) => m.analyzer.id).sort()).toEqual(['a', 'b'])
+    expect(matches.map((m) => m.analyzer.id).sort((a, b) => a.localeCompare(b))).toEqual(['a', 'b'])
   })
 
   it('returns undefined for unknown analyzer ids', () => {

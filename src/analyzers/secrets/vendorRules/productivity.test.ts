@@ -398,7 +398,7 @@ describe('PRODUCTIVITY_SECRET_RULES — coverage', () => {
   })
 
   it('exposes the expected rule ids', () => {
-    const ids = PRODUCTIVITY_SECRET_RULES.map((r) => r.id).sort()
+    const ids = PRODUCTIVITY_SECRET_RULES.map((r) => r.id).sort((a, b) => a.localeCompare(b))
     expect(ids).toEqual([
       'secret.asana.patLabelled',
       'secret.figma.pat',

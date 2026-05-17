@@ -264,7 +264,7 @@ describe('CI_SECRET_RULES — coverage', () => {
   })
 
   it('exposes the expected rule ids', () => {
-    const ids = CI_SECRET_RULES.map((r) => r.id).sort()
+    const ids = CI_SECRET_RULES.map((r) => r.id).sort((a, b) => a.localeCompare(b))
     expect(ids).toEqual([
       'secret.buildkite.agentToken',
       'secret.buildkite.apiToken',

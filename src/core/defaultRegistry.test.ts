@@ -4,7 +4,7 @@ import { createDefaultRegistry } from './defaultRegistry'
 describe('createDefaultRegistry', () => {
   it('registers all built-in analyzers', () => {
     const reg = createDefaultRegistry()
-    const ids = reg.list().map((a) => a.id).sort()
+    const ids = reg.list().map((a) => a.id).sort((a, b) => a.localeCompare(b))
     expect(ids).toEqual([
       'awsSigv4',
       'basicAuth',
