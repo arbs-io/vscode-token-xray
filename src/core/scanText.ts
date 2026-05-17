@@ -1,6 +1,7 @@
 import { AnalyzerRegistry } from './registry'
 import { DiagnosticDto, diagnosticsAcrossRegistry } from './diagnostics'
 import { matchesAnyGlob } from './globMatch'
+import { SeverityOverrideMap } from './severityOverrides'
 
 export interface SecretsScanSettings {
   /**
@@ -25,6 +26,12 @@ export interface SecretsScanSettings {
 export interface ScanTextSettings {
   /** Settings affecting the secret analyzer. */
   secrets?: SecretsScanSettings
+  /**
+   * Per-rule severity override map (forwards directly to
+   * `applySeverityOverrides`). Applied at the registry boundary to every
+   * analyzer's findings — not just secret findings.
+   */
+  ruleSeverity?: SeverityOverrideMap
 }
 
 export const DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES = 1_048_576 // 1 MiB
@@ -52,7 +59,9 @@ export async function scanText(
 ): Promise<DiagnosticDto[]> {
   if (!text) return []
 
-  const all = await diagnosticsAcrossRegistry(text, registry)
+  const all = await diagnosticsAcrossRegistry(text, registry, {
+    ruleSeverity: settings.ruleSeverity,
+  })
   if (all.length === 0) return all
 
   if (shouldDropSecrets(text, filename, settings.secrets)) {

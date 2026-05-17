@@ -19,6 +19,10 @@ import {
   DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES,
 } from '../core/scanText'
 import { scanDocument } from '../core/scanDocument'
+import {
+  applySeverityOverrides,
+  SeverityOverrideMap,
+} from '../core/severityOverrides'
 import { AnalysisResult, Match } from '../core/types'
 
 const SUPPORTED_SCHEMES = new Set(['file', 'untitled'])
@@ -31,6 +35,11 @@ function isInlayHintsEnabled(uri: Uri): boolean {
 function readMaxFileSizeBytes(uri: Uri): number {
   const config = workspace.getConfiguration('tokenXray', uri)
   return config.get<number>('secrets.maxFileSizeBytes', DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES)
+}
+
+function readRuleSeverity(uri: Uri): SeverityOverrideMap {
+  const config = workspace.getConfiguration('tokenXray', uri)
+  return config.get<SeverityOverrideMap>('ruleSeverity', {})
 }
 
 /**
@@ -93,9 +102,15 @@ export class SecurityInlayHintsProvider implements InlayHintsProvider {
         endColumn: hit.endColumn,
       }
 
-      // Honour inline `tokenxray-disable-*` directives so the inlay
-      // hint mapper never sees suppressed findings.
-      const located: FindingWithLocation[] = (result.findings ?? []).map((finding) => ({
+      // Honour user-configured per-rule severity overrides AND inline
+      // `tokenxray-disable-*` directives so the inlay hint mapper never
+      // sees suppressed (or re-graded) findings. Order mirrors the
+      // registry-boundary sequence in `diagnosticsAcrossRegistry`.
+      const overridden = applySeverityOverrides(
+        result.findings ?? [],
+        readRuleSeverity(document.uri)
+      )
+      const located: FindingWithLocation[] = overridden.map((finding) => ({
         ...finding,
         startLine: hit.startLine,
       }))

@@ -18,6 +18,10 @@ import {
   DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES,
 } from '../core/scanText'
 import { scanDocument } from '../core/scanDocument'
+import {
+  applySeverityOverrides,
+  SeverityOverrideMap,
+} from '../core/severityOverrides'
 import { Match } from '../core/types'
 import { LocalStorageService } from '../services/storageService'
 import { stringHash } from '../utils/stringHash'
@@ -33,6 +37,11 @@ const SUPPORTED_SCHEMES = new Set(['file', 'untitled'])
 function readMaxFileSizeBytes(uri: Uri): number {
   const config = workspace.getConfiguration('tokenXray', uri)
   return config.get<number>('secrets.maxFileSizeBytes', DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES)
+}
+
+function readRuleSeverity(uri: Uri): SeverityOverrideMap {
+  const config = workspace.getConfiguration('tokenXray', uri)
+  return config.get<SeverityOverrideMap>('ruleSeverity', {})
 }
 
 /**
@@ -76,10 +85,16 @@ class GenericHoverProvider implements HoverProvider {
 
     try {
       const result = await Promise.resolve(analyzer.analyze(match))
-      // Honour inline `tokenxray-disable-*` directives: drop any
-      // findings that are suppressed for this hit's line before we
-      // render the hover preview.
-      const located: FindingWithLocation[] = (result.findings ?? []).map((finding) => ({
+      // Honour user-configured per-rule severity overrides AND inline
+      // `tokenxray-disable-*` directives: drop or rewrite any findings
+      // that are silenced / re-graded for this hit's line before we
+      // render the hover preview. Order mirrors the registry-boundary
+      // sequence in `diagnosticsAcrossRegistry`.
+      const overridden = applySeverityOverrides(
+        result.findings ?? [],
+        readRuleSeverity(document.uri)
+      )
+      const located: FindingWithLocation[] = overridden.map((finding) => ({
         ...finding,
         startLine: hit.startLine,
       }))

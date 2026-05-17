@@ -135,6 +135,54 @@ describe('diagnosticsAcrossRegistry', () => {
     expect(out.every((d) => d.code !== 'first.flagged')).toBe(true)
   })
 
+  it('drops findings whose id maps to `off` via ruleSeverity', async () => {
+    const token = `${b64u({ alg: 'none' })}.${b64u({ sub: 'x' })}.`
+    const out = await diagnosticsAcrossRegistry(token, reg, {
+      ruleSeverity: { 'jwt.alg.none': 'off' },
+    })
+    expect(out.every((d) => d.code !== 'jwt.alg.none')).toBe(true)
+  })
+
+  it('rewrites severity via ruleSeverity', async () => {
+    const token = `${b64u({ alg: 'none' })}.${b64u({ sub: 'x' })}.`
+    const out = await diagnosticsAcrossRegistry(token, reg, {
+      ruleSeverity: { 'jwt.alg.none': 'warning' },
+    })
+    const algNone = out.find((d) => d.code === 'jwt.alg.none')
+    expect(algNone?.severity).toBe('warning')
+  })
+
+  it('honours `off` via ruleSeverity even when no inline directive is present', async () => {
+    // Same fixture as the disable-comment test, but with no comment in
+    // the document — ruleSeverity should still drop the finding.
+    const token = `${b64u({ alg: 'none' })}.${b64u({ sub: 'x' })}.`
+    const text = `code goes here\n${token}\n`
+    const out = await diagnosticsAcrossRegistry(text, reg, {
+      ruleSeverity: { 'jwt.alg.none': 'off' },
+    })
+    expect(out.every((d) => d.code !== 'jwt.alg.none')).toBe(true)
+  })
+
+  it('returns [] when ruleSeverity drops every finding', async () => {
+    // Single analyzer, single finding, hard-suppressed via wildcard.
+    const reg2 = createDefaultRegistry()
+    reg2.register({
+      id: 'lonely',
+      name: 'lonely',
+      detect: (t) => (t.length > 0 ? [{ text: t, range: { start: 0, end: t.length } }] : []),
+      analyze: () => ({
+        analyzerId: 'lonely',
+        kind: 'demo',
+        sections: [],
+        findings: [{ id: 'lonely.warn', severity: 'warning' as const, message: 'w' }],
+      }),
+    })
+    const out = await diagnosticsAcrossRegistry('hello', reg2, {
+      ruleSeverity: { 'lonely.*': 'off' },
+    })
+    expect(out).toEqual([])
+  })
+
   it('preserves duplicate findings that happen to share id + line + message', async () => {
     // Two analyzer registrations emit the same finding shape on the
     // same line. The dedup-aware filter must not collapse them.

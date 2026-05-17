@@ -18,6 +18,7 @@ import {
   ScanTextSettings,
   scanText,
 } from '../core/scanText'
+import { SeverityOverrideMap } from '../core/severityOverrides'
 
 const SEVERITY_MAP: Record<DiagnosticDto['severity'], DiagnosticSeverity> = {
   error: DiagnosticSeverity.Error,
@@ -40,7 +41,7 @@ function dtoToDiagnostic(dto: DiagnosticDto): Diagnostic {
   return diag
 }
 
-function readSecretsSettings(uri: Uri): ScanTextSettings {
+function readScanSettings(uri: Uri): ScanTextSettings {
   const config = workspace.getConfiguration('tokenXray', uri)
   return {
     secrets: {
@@ -51,6 +52,7 @@ function readSecretsSettings(uri: Uri): ScanTextSettings {
         DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES
       ),
     },
+    ruleSeverity: config.get<SeverityOverrideMap>('ruleSeverity', {}),
   }
 }
 
@@ -153,7 +155,7 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
       return
     }
     try {
-      const settings = readSecretsSettings(doc.uri)
+      const settings = readScanSettings(doc.uri)
       const filename = filenameFor(doc)
       const dtos = await scanText(doc.getText(), filename, registry, settings)
       collection.set(doc.uri, dtos.map(dtoToDiagnostic))
@@ -193,7 +195,12 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     workspace.onDidChangeTextDocument((e) => void refresh(e.document)),
     workspace.onDidCloseTextDocument((doc) => collection.delete(doc.uri)),
     workspace.onDidChangeConfiguration((e) => {
-      if (!e.affectsConfiguration('tokenXray.secrets')) return
+      if (
+        !e.affectsConfiguration('tokenXray.secrets') &&
+        !e.affectsConfiguration('tokenXray.ruleSeverity')
+      ) {
+        return
+      }
       refreshAll()
     }),
     workspace.onDidCreateFiles(() => void refreshOnIgnoreEvent()),
