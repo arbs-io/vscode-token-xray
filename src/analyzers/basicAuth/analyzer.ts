@@ -32,8 +32,11 @@ const AUTH_HEADER_REGEX = /Authorization\s*[:=]\s*Basic\s+([A-Z0-9+/_=-]{8,})/gi
  * must actually decode to a non-empty `user:pass` pair — that check
  * happens in `findInternalHits`.
  */
-const LABEL_ENV_REGEX = /(?<!\w)(?:BASIC_AUTH(?:_CREDS?|_CREDENTIALS?)?|AUTH_BASIC|AUTHORIZATION)\s*=\s*["']?([A-Za-z0-9+/_=-]{8,})["']?/g
-const LABEL_KV_REGEX = /(?<!\w)(basic[_-]?auth|auth(?:orization)?|credentials|creds)(?!\w)\s*[:=]\s*["']?([A-Z0-9+/_=-]{8,})["']?/gi
+const BASE64_BODY = '[A-Za-z0-9+/_=-]{8,}'
+const ENV_LABELS = '(?:BASIC_AUTH(?:_CREDS?|_CREDENTIALS?)?|AUTH_BASIC|AUTHORIZATION)'
+const KV_LABELS = '(basic[_-]?auth|auth(?:orization)?|credentials|creds)'
+const LABEL_ENV_REGEX = new RegExp(String.raw`(?<!\w)${ENV_LABELS}\s*=\s*["']?(${BASE64_BODY})["']?`, 'g')
+const LABEL_KV_REGEX = new RegExp(String.raw`(?<!\w)${KV_LABELS}(?!\w)\s*[:=]\s*["']?(${BASE64_BODY})["']?`, 'gi')
 
 interface InternalHit {
   /** Full text of the matched span (for downstream highlighting). */
