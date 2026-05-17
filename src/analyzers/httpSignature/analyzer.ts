@@ -20,6 +20,49 @@ interface InternalHit {
   pairedSignatureLine?: string
 }
 
+interface InputCandidate {
+  line: string
+  start: number
+  end: number
+  label: string
+}
+
+interface SigCandidate {
+  line: string
+  start: number
+  end: number
+  label?: string
+}
+
+function collectInputCandidates(text: string): InputCandidate[] {
+  const out: InputCandidate[] = []
+  SIGNATURE_INPUT_LINE_REGEX.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = SIGNATURE_INPUT_LINE_REGEX.exec(text)) !== null) {
+    const line = m[0]
+    const start = m.index
+    const end = start + line.length
+    const labelMatch = /Signature-Input\s*[:=]\s*([A-Z0-9_-]+)\s*=/i.exec(line)
+    if (labelMatch) out.push({ line, start, end, label: labelMatch[1] })
+  }
+  return out
+}
+
+function collectSigCandidates(text: string): SigCandidate[] {
+  const out: SigCandidate[] = []
+  SIGNATURE_LINE_REGEX.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = SIGNATURE_LINE_REGEX.exec(text)) !== null) {
+    const line = m[0]
+    if (/^[ \t]*Signature-Input/i.test(line)) continue
+    const start = m.index
+    const end = start + line.length
+    const labelMatch = /Signature\s*[:=]\s*([A-Z0-9_-]+)\s*=\s*:/i.exec(line)
+    out.push({ line, start, end, label: labelMatch?.[1] })
+  }
+  return out
+}
+
 function findInternalHits(text: string): InternalHit[] {
   if (!text) return []
   const hits: InternalHit[] = []
@@ -33,55 +76,13 @@ function findInternalHits(text: string): InternalHit[] {
     return true
   }
 
-  // Pass 1: collect every `Signature-Input:` line and try to pair each
-  // with a `Signature:` line further along the buffer. RFC 9421
-  // headers travel as a pair, so we look ahead within the same text
-  // and match by label.
-  const inputCandidates: Array<{
-    line: string
-    start: number
-    end: number
-    label: string
-  }> = []
-  SIGNATURE_INPUT_LINE_REGEX.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = SIGNATURE_INPUT_LINE_REGEX.exec(text)) !== null) {
-    const line = m[0]
-    const start = m.index
-    const end = start + line.length
-    const labelMatch = /Signature-Input\s*[:=]\s*([A-Za-z0-9_-]+)\s*=/i.exec(line)
-    if (!labelMatch) continue
-    inputCandidates.push({ line, start, end, label: labelMatch[1] })
-  }
+  const inputCandidates = collectInputCandidates(text)
+  const sigCandidates = collectSigCandidates(text)
 
-  // Pass 2: collect every `Signature:` line (excluding `Signature-Input`
-  // — the regex is `Signature\s*[:=]` so it would otherwise match
-  // both).
-  const sigCandidates: Array<{ line: string; start: number; end: number; label?: string }> = []
-  SIGNATURE_LINE_REGEX.lastIndex = 0
-  while ((m = SIGNATURE_LINE_REGEX.exec(text)) !== null) {
-    const line = m[0]
-    // Exclude lines that begin with `Signature-Input` — they were
-    // already collected above and would otherwise be re-matched.
-    if (/^[ \t]*Signature-Input/i.test(line)) continue
-    const start = m.index
-    const end = start + line.length
-    // Capture the leading label for RFC 9421 form (`sig1=:…:`).
-    const labelMatch = /Signature\s*[:=]\s*([A-Za-z0-9_-]+)\s*=\s*:/i.exec(line)
-    sigCandidates.push({
-      line,
-      start,
-      end,
-      label: labelMatch ? labelMatch[1] : undefined,
-    })
-  }
-
-  // Pair Signature-Input → Signature by label.
   for (const inp of inputCandidates) {
     const partner = sigCandidates.find((s) => s.label === inp.label)
     const parsed = parseRfc9421(inp.line, partner?.line)
-    if (!parsed) continue
-    if (!claim(inp.start, inp.end)) continue
+    if (!parsed || !claim(inp.start, inp.end)) continue
     if (partner) claim(partner.start, partner.end)
     hits.push({
       text: inp.line,
@@ -91,13 +92,9 @@ function findInternalHits(text: string): InternalHit[] {
     })
   }
 
-  // Remaining (unclaimed) `Signature:` lines: try the Cavage parser.
   for (const sig of sigCandidates) {
     if (!claim(sig.start, sig.end)) continue
-    const parsed = parseCavageSignature(sig.line)
-    if (!parsed) {
-      // Roll back the claim so a future analyzer pass on this text
-      // doesn't see a phantom block.
+    if (!parseCavageSignature(sig.line)) {
       claimed.pop()
       continue
     }
