@@ -14,27 +14,7 @@ export function evaluateJwt(decoded: DecodedJwt, options: JwtFindingOptions = {}
   const nowSec = Math.floor((options.now ?? Date.now()) / 1000)
 
   const alg = decoded.header.alg
-  if (alg === undefined) {
-    findings.push({
-      id: 'jwt.header.alg.missing',
-      severity: 'error',
-      message: 'JOSE header is missing the "alg" field.',
-      docUrl: 'https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.1',
-    })
-  } else if (DANGEROUS_ALGS.has(alg)) {
-    findings.push({
-      id: 'jwt.alg.none',
-      severity: 'error',
-      message: 'Token uses "alg":"none" — signature is not verified. Reject in production.',
-      docUrl: 'https://www.rfc-editor.org/rfc/rfc7518#section-3.6',
-    })
-  } else if (WEAK_ALGS.has(alg)) {
-    findings.push({
-      id: 'jwt.alg.weak',
-      severity: 'warning',
-      message: `Token uses ${alg}; consider an asymmetric algorithm (RS256/ES256/EdDSA) for tokens shared across services.`,
-    })
-  }
+  findings.push(...evaluateAlg(alg))
 
   if (decoded.kind === 'JWS' && !decoded.header.kid && alg && alg !== 'none') {
     findings.push({
@@ -55,83 +35,130 @@ export function evaluateJwt(decoded: DecodedJwt, options: JwtFindingOptions = {}
   const payload = decoded.payload
   if (!payload) return findings
 
-  if (payload.exp !== undefined) {
-    if (typeof payload.exp !== 'number') {
-      findings.push({
-        id: 'jwt.exp.invalid',
-        severity: 'error',
-        message: '"exp" must be a NumericDate (seconds since epoch).',
-      })
-    } else if (payload.exp <= nowSec) {
-      findings.push({
-        id: 'jwt.exp.expired',
-        severity: 'error',
-        message: `Token expired at ${new Date(payload.exp * 1000).toISOString()}.`,
-      })
-    }
-  } else {
-    findings.push({
+  findings.push(...evaluateExp(payload, nowSec))
+  findings.push(...evaluateNbf(payload, nowSec))
+  findings.push(...evaluateIat(payload, nowSec))
+  findings.push(...evaluateAud(payload))
+  findings.push(...evaluateIss(payload))
+
+  return findings
+}
+
+function evaluateAlg(alg: unknown): Finding[] {
+  if (alg === undefined) {
+    return [{
+      id: 'jwt.header.alg.missing',
+      severity: 'error',
+      message: 'JOSE header is missing the "alg" field.',
+      docUrl: 'https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.1',
+    }]
+  }
+  if (typeof alg === 'string' && DANGEROUS_ALGS.has(alg)) {
+    return [{
+      id: 'jwt.alg.none',
+      severity: 'error',
+      message: 'Token uses "alg":"none" — signature is not verified. Reject in production.',
+      docUrl: 'https://www.rfc-editor.org/rfc/rfc7518#section-3.6',
+    }]
+  }
+  if (typeof alg === 'string' && WEAK_ALGS.has(alg)) {
+    return [{
+      id: 'jwt.alg.weak',
+      severity: 'warning',
+      message: `Token uses ${alg}; consider an asymmetric algorithm (RS256/ES256/EdDSA) for tokens shared across services.`,
+    }]
+  }
+  return []
+}
+
+function evaluateExp(payload: Record<string, unknown>, nowSec: number): Finding[] {
+  if (payload.exp === undefined) {
+    return [{
       id: 'jwt.exp.missing',
       severity: 'warning',
       message: '"exp" claim is missing — token has no expiry.',
-    })
+    }]
   }
-
-  if (payload.nbf !== undefined) {
-    if (typeof payload.nbf !== 'number') {
-      findings.push({
-        id: 'jwt.nbf.invalid',
-        severity: 'error',
-        message: '"nbf" must be a NumericDate (seconds since epoch).',
-      })
-    } else if (payload.nbf > nowSec) {
-      findings.push({
-        id: 'jwt.nbf.future',
-        severity: 'warning',
-        message: `Token not valid until ${new Date(payload.nbf * 1000).toISOString()}.`,
-      })
-    }
+  if (typeof payload.exp !== 'number') {
+    return [{
+      id: 'jwt.exp.invalid',
+      severity: 'error',
+      message: '"exp" must be a NumericDate (seconds since epoch).',
+    }]
   }
+  if (payload.exp <= nowSec) {
+    return [{
+      id: 'jwt.exp.expired',
+      severity: 'error',
+      message: `Token expired at ${new Date(payload.exp * 1000).toISOString()}.`,
+    }]
+  }
+  return []
+}
 
-  if (payload.iat !== undefined && typeof payload.iat === 'number' && payload.iat > nowSec + 60) {
-    findings.push({
+function evaluateNbf(payload: Record<string, unknown>, nowSec: number): Finding[] {
+  if (payload.nbf === undefined) return []
+  if (typeof payload.nbf !== 'number') {
+    return [{
+      id: 'jwt.nbf.invalid',
+      severity: 'error',
+      message: '"nbf" must be a NumericDate (seconds since epoch).',
+    }]
+  }
+  if (payload.nbf > nowSec) {
+    return [{
+      id: 'jwt.nbf.future',
+      severity: 'warning',
+      message: `Token not valid until ${new Date(payload.nbf * 1000).toISOString()}.`,
+    }]
+  }
+  return []
+}
+
+function evaluateIat(payload: Record<string, unknown>, nowSec: number): Finding[] {
+  if (typeof payload.iat === 'number' && payload.iat > nowSec + 60) {
+    return [{
       id: 'jwt.iat.future',
       severity: 'warning',
       message: `"iat" is in the future (${new Date(payload.iat * 1000).toISOString()}). Clock skew or forged token.`,
-    })
+    }]
   }
+  return []
+}
 
+function evaluateAud(payload: Record<string, unknown>): Finding[] {
   if (payload.aud === undefined) {
-    findings.push({
+    return [{
       id: 'jwt.aud.missing',
       severity: 'info',
       message: '"aud" claim is missing — verifiers cannot assert intended audience.',
-    })
+    }]
   }
+  return []
+}
 
+function evaluateIss(payload: Record<string, unknown>): Finding[] {
   if (payload.iss === undefined) {
-    findings.push({
+    return [{
       id: 'jwt.iss.missing',
       severity: 'info',
       message: '"iss" claim is missing — verifiers cannot assert the issuer.',
-    })
-  } else if (typeof payload.iss === 'string') {
-    const recognized = recognizeIssuer(payload.iss)
-    if (recognized) {
-      const parts: string[] = [`Issued by ${recognized.pattern.name}.`]
-      if (recognized.tenant) parts.push(`Tenant/pool: ${recognized.tenant}.`)
-      for (const [key, value] of Object.entries(recognized.extras)) {
-        parts.push(`${key}: ${value}.`)
-      }
-      if (recognized.pattern.guidance) parts.push(recognized.pattern.guidance)
-      findings.push({
-        id: `jwt.idp.${recognized.pattern.id}`,
-        severity: 'info',
-        message: parts.join(' '),
-        docUrl: recognized.pattern.docUrl,
-      })
-    }
+    }]
   }
+  if (typeof payload.iss !== 'string') return []
+  const recognized = recognizeIssuer(payload.iss)
+  if (!recognized) return []
 
-  return findings
+  const parts: string[] = [`Issued by ${recognized.pattern.name}.`]
+  if (recognized.tenant) parts.push(`Tenant/pool: ${recognized.tenant}.`)
+  for (const [key, value] of Object.entries(recognized.extras)) {
+    parts.push(`${key}: ${value}.`)
+  }
+  if (recognized.pattern.guidance) parts.push(recognized.pattern.guidance)
+  return [{
+    id: `jwt.idp.${recognized.pattern.id}`,
+    severity: 'info',
+    message: parts.join(' '),
+    docUrl: recognized.pattern.docUrl,
+  }]
 }
