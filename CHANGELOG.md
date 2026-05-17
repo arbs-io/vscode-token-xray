@@ -3,7 +3,7 @@
 All notable changes to Token X-Ray are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
-## [2.0.0] — 2026-05-17
+## [1.2.0] — 2026-05-17
 
 ### Added — Token & cryptographic formats
 
@@ -79,10 +79,25 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - Renamed from "JWT Decoder" to "Token X-Ray"
 - Repository moved to `vscode-token-xray`; `package.json` `repository.url` updated to match the new git remote
+- Findings tree view: every analyzer kind now has its own codicon (key, shield, verified, lock, cloud, gist-secret, terminal, …) tinted to the worst severity. Section groups (`JOSE Header`, `Claims`, `Certificate`, `Subject & Key`, etc.) gained per-title icons; finding rows show a coloured severity icon and a compact `1E 2W 3I` badge on the parent token row.
+- Tightened the JWT claimset webview CSP — `img-src` now restricted to `cspSource + data:` (was `*`); `style-src 'unsafe-inline'` retained intentionally for the React inline-style tree and documented in-source.
+- Marketplace metadata: added `keywords` and moved `categories` to `["Linters","Other"]` so the listing surfaces on security/linter searches.
+
+### Added (1.2)
+
+- **`tokenXray.respectGitignore`** (default `true`) — workspace `.gitignore` patterns (root + nested) are merged with `.tokenxrayignore` so gitignored files (e.g. `.env`, `secrets/`, `dist/`) are skipped by every analyzer. Nested `.gitignore` files are applied relative to their own directory, matching `git` precedence.
+- **`tokenXray.scan.debounceMs`** (default `250`, range `0–2000`) — user-tunable trailing-edge debounce on text-change events. Lower for snappier feedback on small files, higher to throttle CPU on large files.
+- Per-document trailing-edge debounce on `onDidChangeTextDocument` so a typing burst resolves to a single trailing scan instead of one scan per keystroke.
+- Binary-content short-circuit: any document containing a NUL byte in the first 8 KiB is skipped by both the cache and the diagnostics pass, eliminating high-entropy noise on accidentally-opened binaries.
+- Cooperative cancellation via `AbortSignal` plumbed through `scanText` and `diagnosticsAcrossRegistry`; a superseded scan now stops mid-registry-walk instead of running to completion before its result is discarded.
+- `ScanCache` now exposes an optional `onError` callback wired to the debug output channel — analyzer-thrown errors are no longer silently swallowed when `tokenXray.debug` is on.
+- `tokenXray.jwt.keys` entries that don't parse as a recognised shape are reported via a one-shot warning toast (with an **Open Settings** button) and a line in the debug channel; per-config-revision dedup means editing one bad entry doesn't re-toast on every keystroke.
+- Webview React tree migrated to a CSS module (`webview/src/App.module.css`); no remaining `style={}` props in our code. `'unsafe-inline'` is retained in `style-src` only because the deprecated `@vscode/webview-ui-toolkit` web components still need it (documented in-source for future toolkit migration).
+- Shared path utilities (`src/utils/workspacePath.ts`) extracted from the diagnostics and tree-view providers (`notebookFileUri`, `effectiveUri`, `workspaceRelativeFilename`, `workspaceRelativePathForIgnore`, `fallbackDisplayLabel`).
 
 ### Infrastructure
 
-- Vitest test suite (1672+ tests, 90/85/90/90 statements/branches/functions/lines coverage thresholds enforced)
-- GitHub Actions workflow (`.github/workflows/vsix-package.yaml`) runs `npm run typecheck` and `npm run test` on every matrix OS (macos / ubuntu / windows) before `vsce package` produces an artifact
+- Vitest test suite (1783+ tests, 90/85/90/90 statements/branches/functions/lines coverage thresholds enforced); new coverage for `secretCodeActionsProvider`, change-event debouncing, binary detection, JWT key-loader detailed errors, ignore-source matcher (nested `.gitignore`), workspace-path utils, hover provider, code-lens / document-link / document-symbol / inlay-hint smoke tests, and scan cancellation.
+- GitHub Actions workflow bumped to Node 22 (Active LTS) and now runs `npm run test:coverage`, uploads the coverage report as a CI artifact, and runs `npm run check-version`, `npm run typecheck` on every matrix OS before `vsce package`. CodeQL workflow updated to v3 actions and the `javascript-typescript` language pack.
 
-[2.0.0]: https://github.com/arbs-io/vscode-token-xray/releases/tag/v2.0.0
+[1.2.0]: https://github.com/arbs-io/vscode-token-xray/releases/tag/v1.2.0

@@ -6,6 +6,7 @@ import {
 } from "@vscode/webview-ui-toolkit/react";
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
+import styles from "./App.module.css";
 import { ITokenListItem, tokenListItems } from "./utilities/tokenListItems";
 import { vscode } from "./utilities/vscode";
 
@@ -26,45 +27,27 @@ interface JwtPanelPayload {
   isEncrypted: boolean;
 }
 
-const SEVERITY_STYLE: Record<Severity, { bg: string; fg: string; label: string }> = {
-  error: { bg: "#5a1d1d", fg: "#ffb4b4", label: "ERROR" },
-  warning: { bg: "#5a4a1d", fg: "#ffe39a", label: "WARN" },
-  info: { bg: "#1d3a5a", fg: "#a8d4ff", label: "INFO" },
+const SEVERITY_LABEL: Record<Severity, string> = {
+  error: "ERROR",
+  warning: "WARN",
+  info: "INFO",
 };
 
 function FindingsBanner({ findings }: Readonly<{ findings: Finding[] }>) {
   if (findings.length === 0) return null;
   return (
-    <section
-      aria-label="Findings"
-      style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}
-    >
-      {findings.map((f) => {
-        const s = SEVERITY_STYLE[f.severity];
-        return (
-          <div
-            key={f.id}
-            style={{
-              background: s.bg,
-              color: s.fg,
-              padding: "8px 12px",
-              borderRadius: 4,
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <strong style={{ minWidth: 56 }}>{s.label}</strong>
-            <span>{f.message}</span>
-            {f.docUrl ? (
-              <a href={f.docUrl} style={{ color: s.fg, marginLeft: "auto" }}>
-                docs
-              </a>
-            ) : null}
-          </div>
-        );
-      })}
+    <section aria-label="Findings" className={styles.findingsBanner}>
+      {findings.map((f) => (
+        <div key={f.id} className={`${styles.finding} ${styles[f.severity]}`}>
+          <strong className={styles.findingLabel}>{SEVERITY_LABEL[f.severity]}</strong>
+          <span>{f.message}</span>
+          {f.docUrl ? (
+            <a href={f.docUrl} className={styles.findingDocLink}>
+              docs
+            </a>
+          ) : null}
+        </div>
+      ))}
     </section>
   );
 }
@@ -118,32 +101,16 @@ function App() {
       {payload ? <FindingsBanner findings={payload.findings} /> : null}
 
       {payload?.isEncrypted ? (
-        <section
-          style={{
-            padding: 12,
-            border: "1px solid #5a4a1d",
-            borderRadius: 4,
-            color: "#ffe39a",
-            marginBottom: 12,
-          }}
-        >
+        <section className={styles.encryptedNotice}>
           <strong>Encrypted payload (JWE)</strong> — claims cannot be displayed without a decryption key.
           Header below shows the encryption algorithms (<code>alg</code>, <code>enc</code>).
         </section>
       ) : null}
 
       {payload?.header ? (
-        <section style={{ marginBottom: 16 }}>
-          <h3 style={{ margin: "0 0 6px 0", fontSize: 13, opacity: 0.8 }}>JOSE Header</h3>
-          <pre
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              padding: 8,
-              borderRadius: 4,
-              fontSize: 12,
-              margin: 0,
-            }}
-          >
+        <section className={styles.headerSection}>
+          <h3 className={styles.headerTitle}>JOSE Header</h3>
+          <pre className={styles.headerCode}>
             {JSON.stringify(payload.header, null, 2)}
           </pre>
         </section>
@@ -168,16 +135,15 @@ function App() {
                 <img
                   src={claim.claimIcon}
                   alt="logo"
-                  style={{ height: 16, width: 16, marginRight: 8 }}
+                  className={styles.claimIcon}
                 />
                 <VSCodeBadge>{claim.claimName}</VSCodeBadge>
               </VSCodeDataGridCell>
               <VSCodeDataGridCell
-                style={{ whiteSpace: "pre-line" }}
                 key={`claimValue_${claim.claimName}`}
                 gridColumn="2"
               >
-                {claim.claimValue}
+                <div className={styles.claimValueCell}>{claim.claimValue}</div>
               </VSCodeDataGridCell>
               <VSCodeDataGridCell
                 key={`claimDescription_${claim.claimName}`}

@@ -126,12 +126,30 @@ class FakeUri {
 }
 
 class FakeRange {
+  readonly startLine: number
+  readonly startColumn: number
+  readonly endLine: number
+  readonly endColumn: number
   constructor(
-    readonly startLine: number,
-    readonly startColumn: number,
-    readonly endLine: number,
-    readonly endColumn: number
-  ) {}
+    arg0: number | { line: number; character: number },
+    arg1: number | { line: number; character: number },
+    arg2?: number,
+    arg3?: number
+  ) {
+    if (typeof arg0 === 'number' && typeof arg1 === 'number') {
+      this.startLine = arg0
+      this.startColumn = arg1
+      this.endLine = arg2 ?? arg0
+      this.endColumn = arg3 ?? arg1
+    } else {
+      const a = arg0 as { line: number; character: number }
+      const b = arg1 as { line: number; character: number }
+      this.startLine = a.line
+      this.startColumn = a.character
+      this.endLine = b.line
+      this.endColumn = b.character
+    }
+  }
   get start() {
     return { line: this.startLine, character: this.startColumn }
   }
@@ -224,7 +242,25 @@ interface FakeTabChangeEvent {
 }
 
 class FakeThemeIcon {
+  constructor(readonly id: string, readonly color?: FakeThemeColor) {}
+}
+
+class FakeThemeColor {
   constructor(readonly id: string) {}
+}
+
+class FakeMarkdownString {
+  isTrusted = false
+  supportThemeIcons = false
+  constructor(public value: string = '') {}
+  appendText(text: string): this {
+    this.value += text
+    return this
+  }
+  appendMarkdown(md: string): this {
+    this.value += md
+    return this
+  }
 }
 
 const TreeItemCollapsibleState = {
@@ -248,6 +284,115 @@ class FakeTreeItem {
 
 class FakeFileSystemError extends Error {}
 
+class FakeRelativePattern {
+  readonly baseUri: FakeUri
+  readonly pattern: string
+  constructor(base: FakeUri | { uri: FakeUri }, pattern: string) {
+    this.baseUri = (base as { uri?: FakeUri }).uri ?? (base as FakeUri)
+    this.pattern = pattern
+  }
+}
+
+class FakeHover {
+  constructor(readonly contents: unknown, readonly range?: FakeRange) {}
+}
+
+class FakeCodeLens {
+  isResolved = true
+  constructor(readonly range: FakeRange, readonly command?: unknown) {}
+}
+
+class FakeDocumentLink {
+  tooltip?: string
+  constructor(readonly range: FakeRange, readonly target?: FakeUri) {}
+}
+
+class FakeInlayHint {
+  paddingLeft?: boolean
+  paddingRight?: boolean
+  tooltip?: unknown
+  constructor(
+    readonly position: FakePosition,
+    readonly label: string | unknown[],
+    readonly kind?: number
+  ) {}
+}
+
+const InlayHintKind = { Type: 1, Parameter: 2 } as const
+
+class FakeDocumentSymbol {
+  children: FakeDocumentSymbol[] = []
+  constructor(
+    readonly name: string,
+    readonly detail: string,
+    readonly kind: number,
+    readonly range: FakeRange,
+    readonly selectionRange: FakeRange
+  ) {}
+}
+
+const SymbolKind = {
+  File: 0, Module: 1, Namespace: 2, Package: 3, Class: 4, Method: 5,
+  Property: 6, Field: 7, Constructor: 8, Enum: 9, Interface: 10,
+  Function: 11, Variable: 12, Constant: 13, String: 14, Number: 15,
+  Boolean: 16, Array: 17, Object: 18, Key: 19, Null: 20, EnumMember: 21,
+  Struct: 22, Event: 23, Operator: 24, TypeParameter: 25,
+} as const
+
+const StatusBarAlignment = { Left: 1, Right: 2 } as const
+
+class FakeStatusBarItem {
+  text = ''
+  tooltip?: string | unknown
+  command?: string | unknown
+  backgroundColor?: unknown
+  color?: unknown
+  show = vi_noop
+  hide = vi_noop
+  dispose = vi_noop
+}
+
+function vi_noop() {
+  /* test stub */
+}
+
+class FakePosition {
+  constructor(readonly line: number, readonly character: number) {}
+}
+
+const CodeActionKind = {
+  QuickFix: { value: 'quickfix' },
+} as const
+
+class FakeCodeAction {
+  edit?: FakeWorkspaceEdit
+  diagnostics?: FakeDiagnostic[]
+  isPreferred?: boolean
+  constructor(readonly title: string, readonly kind?: { value: string }) {}
+}
+
+interface FakeWorkspaceEditOp {
+  kind: 'replace' | 'insert' | 'createFile'
+  uri: FakeUri
+  range?: FakeRange
+  newText?: string
+  position?: FakePosition
+  options?: { ignoreIfExists?: boolean }
+}
+
+class FakeWorkspaceEdit {
+  readonly ops: FakeWorkspaceEditOp[] = []
+  replace(uri: FakeUri, range: FakeRange, newText: string): void {
+    this.ops.push({ kind: 'replace', uri, range, newText })
+  }
+  insert(uri: FakeUri, position: FakePosition, newText: string): void {
+    this.ops.push({ kind: 'insert', uri, position, newText })
+  }
+  createFile(uri: FakeUri, options?: { ignoreIfExists?: boolean }): void {
+    this.ops.push({ kind: 'createFile', uri, options })
+  }
+}
+
 interface FakeTextDocument {
   uri: FakeUri
   getText(): string
@@ -255,6 +400,7 @@ interface FakeTextDocument {
   isDirty?: boolean
   isClosed?: boolean
   version?: number
+  offsetAt?(position: FakePosition): number
 }
 
 interface FakeWorkspaceFolder {
@@ -274,6 +420,9 @@ interface VscodeMockState {
   workspaceFolders: FakeWorkspaceFolder[]
   configSlices: Map<string, Record<string, unknown>>
   fsReader: ((uri: FakeUri) => Uint8Array | Promise<Uint8Array>) | undefined
+  findFilesHandler:
+    | ((include: unknown, exclude?: unknown) => FakeUri[] | Promise<FakeUri[]>)
+    | undefined
 
   openTextDocEmitter: FakeEventEmitter<FakeTextDocument>
   closeTextDocEmitter: FakeEventEmitter<FakeTextDocument>
@@ -295,6 +444,7 @@ export const vscodeMockState: VscodeMockState = {
   workspaceFolders: [],
   configSlices: new Map(),
   fsReader: undefined,
+  findFilesHandler: undefined,
   openTextDocEmitter: new FakeEventEmitter(),
   closeTextDocEmitter: new FakeEventEmitter(),
   changeTextDocEmitter: new FakeEventEmitter(),
@@ -320,6 +470,7 @@ export function resetVscodeMock(): void {
   vscodeMockState.workspaceFolders.length = 0
   vscodeMockState.configSlices.clear()
   vscodeMockState.fsReader = undefined
+  vscodeMockState.findFilesHandler = undefined
   for (const c of vscodeMockState.diagnosticCollections) c.dispose()
   vscodeMockState.diagnosticCollections.length = 0
   vscodeMockState.openTextDocEmitter.dispose()
@@ -344,6 +495,21 @@ export const vscodeMockModule = {
   Diagnostic: FakeDiagnostic,
   DiagnosticSeverity,
   ThemeIcon: FakeThemeIcon,
+  ThemeColor: FakeThemeColor,
+  MarkdownString: FakeMarkdownString,
+  Position: FakePosition,
+  CodeAction: FakeCodeAction,
+  CodeActionKind,
+  WorkspaceEdit: FakeWorkspaceEdit,
+  RelativePattern: FakeRelativePattern,
+  Hover: FakeHover,
+  CodeLens: FakeCodeLens,
+  DocumentLink: FakeDocumentLink,
+  InlayHint: FakeInlayHint,
+  InlayHintKind,
+  DocumentSymbol: FakeDocumentSymbol,
+  SymbolKind,
+  StatusBarAlignment,
   TreeItem: FakeTreeItem,
   TreeItemCollapsibleState,
   TabInputText: FakeTabInputText,
@@ -401,6 +567,19 @@ export const vscodeMockModule = {
         return vscodeMockState.fsReader(uri)
       },
     },
+    findFiles: async (
+      _include: unknown,
+      _exclude?: unknown,
+      _maxResults?: number
+    ): Promise<FakeUri[]> => {
+      // Tests that care about `findFiles` results register a callback
+      // via `vscodeMockState.findFilesHandler`; the default returns no
+      // matches so unrelated tests don't have to opt in.
+      if (vscodeMockState.findFilesHandler) {
+        return vscodeMockState.findFilesHandler(_include, _exclude)
+      }
+      return []
+    },
   },
 
   window: {
@@ -422,6 +601,26 @@ export const vscodeMockModule = {
         onDidExpandElement: new FakeEventEmitter<unknown>().event,
       }
     },
+    createStatusBarItem: (
+      _alignment?: number,
+      _priority?: number
+    ): FakeStatusBarItem => new FakeStatusBarItem(),
+    showWarningMessage: (..._args: unknown[]): Promise<unknown> => Promise.resolve(undefined),
+    showInformationMessage: (..._args: unknown[]): Promise<unknown> => Promise.resolve(undefined),
+    showErrorMessage: (..._args: unknown[]): Promise<unknown> => Promise.resolve(undefined),
+    activeTextEditor: undefined as unknown,
+    onDidChangeActiveTextEditor: ((listener: Listener<unknown>) => {
+      void listener
+      return { dispose: () => undefined }
+    }),
+  },
+
+  commands: {
+    executeCommand: (..._args: unknown[]): Promise<unknown> => Promise.resolve(undefined),
+    registerCommand: (
+      _name: string,
+      _handler: (...args: unknown[]) => unknown
+    ): { dispose: () => void } => ({ dispose: () => undefined }),
   },
 
   languages: {
@@ -432,6 +631,31 @@ export const vscodeMockModule = {
     },
     onDidChangeDiagnostics: ((listener: Listener<{ uris: readonly FakeUri[] }>) =>
       vscodeMockState.changeDiagnosticsEmitter.event(listener)),
+    registerCodeActionsProvider: (
+      _selector: unknown,
+      _provider: unknown,
+      _metadata?: unknown
+    ): { dispose: () => void } => ({ dispose: () => undefined }),
+    registerHoverProvider: (
+      _selector: unknown,
+      _provider: unknown
+    ): { dispose: () => void } => ({ dispose: () => undefined }),
+    registerDocumentLinkProvider: (
+      _selector: unknown,
+      _provider: unknown
+    ): { dispose: () => void } => ({ dispose: () => undefined }),
+    registerDocumentSymbolProvider: (
+      _selector: unknown,
+      _provider: unknown
+    ): { dispose: () => void } => ({ dispose: () => undefined }),
+    registerInlayHintsProvider: (
+      _selector: unknown,
+      _provider: unknown
+    ): { dispose: () => void } => ({ dispose: () => undefined }),
+    registerCodeLensProvider: (
+      _selector: unknown,
+      _provider: unknown
+    ): { dispose: () => void } => ({ dispose: () => undefined }),
   },
 }
 
@@ -445,6 +669,18 @@ export function makeDoc(uri: FakeUri, text: string): FakeTextDocument {
     isDirty: false,
     isClosed: false,
     version: 1,
+    offsetAt(position: FakePosition): number {
+      // Naive line/character → offset for tests; assumes `text` uses
+      // `\n` newlines (no `\r\n`). Sufficient for the hover tests that
+      // exercise a single-line buffer.
+      let offset = 0
+      let line = 0
+      for (let i = 0; i < text.length && line < position.line; i++) {
+        offset++
+        if (text.charCodeAt(i) === 10) line++
+      }
+      return offset + position.character
+    },
   }
 }
 
@@ -477,13 +713,16 @@ export function createFakeContext(): {
 
 export type { FakeTab, FakeTabChangeEvent, FakeTextDocument, FakeWorkspaceFolder }
 export {
+  FakeCodeAction,
   FakeDiagnostic,
   FakeDiagnosticCollection,
   FakeEventEmitter,
+  FakePosition,
   FakeRange,
   FakeTabInputNotebook,
   FakeTabInputNotebookDiff,
   FakeTabInputText,
   FakeTabInputTextDiff,
   FakeUri,
+  FakeWorkspaceEdit,
 }

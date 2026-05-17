@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keySourcesFromConfig } from './keyLoader'
+import { keySourcesFromConfig, keySourcesFromConfigDetailed } from './keyLoader'
 
 describe('keySourcesFromConfig', () => {
   it('returns empty array for non-array input', () => {
@@ -43,5 +43,31 @@ describe('keySourcesFromConfig', () => {
 
   it('skips entries missing alg', () => {
     expect(keySourcesFromConfig([{ pem: '...' }, { secret: 'x' }])).toEqual([])
+  })
+})
+
+describe('keySourcesFromConfigDetailed', () => {
+  it('returns issues with the original index for invalid entries', () => {
+    const { sources, issues } = keySourcesFromConfigDetailed([
+      { pem: '...' },                          // missing alg
+      { kty: 'EC', crv: 'P-256', x: 'a', y: 'b' }, // valid jwk
+      null,                                    // null entry
+      'nope',                                  // wrong type
+    ])
+    expect(sources).toHaveLength(1)
+    expect(issues).toEqual([
+      { index: 0, reason: expect.stringContaining('missing string "alg"') },
+      { index: 2, reason: expect.stringContaining('null/undefined') },
+      { index: 3, reason: expect.stringContaining('must be an object') },
+    ])
+  })
+
+  it('returns empty issues for non-array input', () => {
+    expect(keySourcesFromConfigDetailed(undefined)).toEqual({ sources: [], issues: [] })
+  })
+
+  it('reports the canonical reason for entries lacking a recognised shape', () => {
+    const { issues } = keySourcesFromConfigDetailed([{ random: 'thing' }])
+    expect(issues[0].reason).toMatch(/"pem"\+"alg"/)
   })
 })

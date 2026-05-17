@@ -1,10 +1,11 @@
+import { dirname } from 'node:path'
 import {
   Diagnostic,
   DiagnosticSeverity,
   ExtensionContext,
-  FileSystemError,
   languages,
   Range,
+  RelativePattern,
   TextDocument,
   Uri,
   window,
@@ -13,7 +14,8 @@ import {
 } from 'vscode'
 import { createDefaultRegistry } from '../core/defaultRegistry'
 import { DiagnosticDto } from '../core/diagnostics'
-import { matchIgnore, parseIgnoreFile } from '../core/ignoreFile'
+import { parseIgnoreFile } from '../core/ignoreFile'
+import { IgnoreSource, isIgnoredByAnySource } from '../core/ignoreSources'
 import {
   DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES,
   ScanTextMetrics,
@@ -22,6 +24,11 @@ import {
 } from '../core/scanText'
 import { SeverityOverrideMap } from '../core/severityOverrides'
 import { effectiveTabUri, openTabUriStrings } from '../utils/openTabs'
+import {
+  effectiveUri,
+  fallbackDisplayLabel,
+  workspaceRelativeFilename,
+} from '../utils/workspacePath'
 import { getDebugLogger } from './debugOutputChannel'
 
 const SEVERITY_MAP: Record<DiagnosticDto['severity'], DiagnosticSeverity> = {
@@ -37,22 +44,7 @@ const SEVERITY_MAP: Record<DiagnosticDto['severity'], DiagnosticSeverity> = {
 // open/change/close events for it, so no separate notebook listener is needed.
 const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell'])
 const IGNORE_FILE_NAME = '.tokenxrayignore'
-
-/**
- * Recover the parent `.ipynb` file path from a `vscode-notebook-cell` URI.
- *
- * VS Code encodes the cell URI as `vscode-notebook-cell:///path/to/file.ipynb#cellId`,
- * so the notebook's on-disk path lives in `uri.path` and the cell id lives in
- * `uri.fragment`. Building a synthetic `file:` URI with the same `.path` lets
- * the caller reuse the existing `filenameFor` / `relativeFor` plumbing — the
- * fsPath conversion handles the leading slash + Windows drive-letter quirks
- * exactly the same way it does for a real file URI.
- */
-function notebookFileUri(cellUri: Uri): Uri | undefined {
-  if (cellUri.scheme !== 'vscode-notebook-cell') return undefined
-  if (!cellUri.path) return undefined
-  return cellUri.with({ scheme: 'file', fragment: '' })
-}
+const GITIGNORE_FILE_NAME = '.gitignore'
 
 function dtoToDiagnostic(dto: DiagnosticDto): Diagnostic {
   const diag = new Diagnostic(
@@ -84,71 +76,79 @@ function readScanSettings(uri: Uri): ScanTextSettings {
   }
 }
 
-function filenameFor(doc: TextDocument): string | undefined {
-  // For notebook cell documents the on-disk filename is the parent
-  // `.ipynb`; the cell URI itself has no on-disk representation. Falling
-  // back to the synthesised file URI keeps exclude-glob matching aligned
-  // with how the user thinks about the file (`notebooks/leak.ipynb`).
-  const sourceUri = notebookFileUri(doc.uri) ?? doc.uri
-  if (sourceUri.scheme === 'file') {
-    const folder = workspace.getWorkspaceFolder(sourceUri)
-    if (folder) {
-      const folderPath = folder.uri.fsPath
-      const filePath = sourceUri.fsPath
-      if (filePath.startsWith(folderPath)) {
-        // Strip the workspace prefix + leading separator so exclude globs are
-        // matched against a workspace-relative path.
-        return filePath.slice(folderPath.length).replace(/^[\\/]+/, '')
-      }
-    }
-    return sourceUri.fsPath
-  }
-  // untitled buffers — no on-disk filename
-  return undefined
-}
+// Path helpers (`filenameFor`, `relativeFor`, `notebookFileUri`) moved
+// to `src/utils/workspacePath.ts` so the tree-view provider and any
+// future analyzer can share the same notebook → fsPath translation.
 
 /**
- * Returns the document's path relative to its workspace folder (forward
- * slashes), or `undefined` when the document isn't on disk or doesn't
- * sit inside any workspace folder. Used by the `.tokenxrayignore` check
- * — un-rooted documents can never match a workspace-scoped ignore file.
- */
-function relativeFor(
-  doc: TextDocument,
-  folder: WorkspaceFolder
-): string | undefined {
-  // For notebook cell documents the path is on the parent `.ipynb` URI;
-  // applying the ignore pattern against that path means ignoring
-  // `*.ipynb` suppresses every cell in the notebook in one shot.
-  const sourceUri = notebookFileUri(doc.uri) ?? doc.uri
-  if (sourceUri.scheme !== 'file') return undefined
-  const folderPath = folder.uri.fsPath
-  const filePath = sourceUri.fsPath
-  if (!filePath.startsWith(folderPath)) return undefined
-  return filePath.slice(folderPath.length).replace(/^[\\/]+/, '').replace(/\\/g, '/')
-}
-
-/**
- * Load + parse the `.tokenxrayignore` file at the root of `folder`,
- * returning the active pattern list (or `[]` when no file exists).
+ * Read a single ignore file at the root of `folder` and return its
+ * parsed pattern list. Missing or unreadable files yield `[]` so the
+ * caller can merge multiple sources without per-file error handling.
  *
- * Any I/O error other than "file not found" is swallowed so the
- * provider keeps working even if the file is unreadable; the cache
- * entry simply falls back to an empty pattern list.
+ * Both `FileSystemError` (FNF — the common case when the file simply
+ * doesn't exist) and any other read failure resolve to the same
+ * empty-list answer; the diagnostics provider is best-effort about
+ * ignore files and never surfaces a parse error to the user.
  */
-async function loadIgnorePatterns(folder: WorkspaceFolder): Promise<string[]> {
-  const uri = Uri.joinPath(folder.uri, IGNORE_FILE_NAME)
+async function loadPatternsFromFile(
+  folder: WorkspaceFolder,
+  fileName: string
+): Promise<string[]> {
+  const uri = Uri.joinPath(folder.uri, fileName)
   try {
     const bytes = await workspace.fs.readFile(uri)
     const text = new TextDecoder('utf-8').decode(bytes)
     return parseIgnoreFile(text)
-  } catch (err) {
-    // FileNotFound is the common case (no .tokenxrayignore in the
-    // workspace). We treat any read failure as "no patterns" rather
-    // than surfacing an error — this is a best-effort feature.
-    if (err instanceof FileSystemError) return []
+  } catch {
     return []
   }
+}
+
+/**
+ * Discover the ignore sources for a workspace folder. Always includes
+ * `<folder>/.tokenxrayignore`; when `tokenXray.respectGitignore` is
+ * true (the default) it also folds in every `.gitignore` found inside
+ * the folder (root + nested) via `workspace.findFiles`. Each file
+ * becomes its own {@link IgnoreSource} so patterns are matched
+ * relative to the file's own directory, matching `git` semantics.
+ *
+ * `node_modules`, `.git`, and `out` are excluded from the search so
+ * `findFiles` doesn't recurse into multi-thousand-file dependency
+ * trees on every refresh.
+ */
+async function loadIgnoreSources(folder: WorkspaceFolder): Promise<IgnoreSource[]> {
+  const sources: IgnoreSource[] = []
+
+  const tokenXrayPatterns = await loadPatternsFromFile(folder, IGNORE_FILE_NAME)
+  if (tokenXrayPatterns.length > 0) {
+    sources.push({ baseDir: folder.uri.fsPath, patterns: tokenXrayPatterns })
+  }
+
+  const config = workspace.getConfiguration('tokenXray', folder.uri)
+  if (!config.get<boolean>('respectGitignore', true)) return sources
+
+  // Limit to a reasonable depth/file-count so massive monorepos don't
+  // pay the discovery cost on every reload. 500 is plenty for typical
+  // workspaces; users with more can fall back to `.tokenxrayignore`.
+  const gitignoreUris = await workspace.findFiles(
+    new RelativePattern(folder, '**/.gitignore'),
+    '**/{node_modules,.git,out,dist,coverage}/**',
+    500
+  )
+  for (const uri of gitignoreUris) {
+    if (uri.scheme !== 'file') continue
+    try {
+      const bytes = await workspace.fs.readFile(uri)
+      const patterns = parseIgnoreFile(new TextDecoder('utf-8').decode(bytes))
+      if (patterns.length === 0) continue
+      sources.push({ baseDir: dirname(uri.fsPath), patterns })
+    } catch {
+      // FNF is the common case (file deleted between discovery and
+      // read); we treat any read failure as "no patterns" rather than
+      // surfacing an error.
+    }
+  }
+  return sources
 }
 
 /**
@@ -170,67 +170,126 @@ function formatScanSummary(label: string, metrics: ScanTextMetrics): string {
   return `${label}: scanned ${metrics.scanned} tokens, suppressed ${suppressed} (${metrics.droppedBySecretsFilter} secrets / ${ignored} ignored)`
 }
 
-export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
+/**
+ * Default trailing-edge debounce window for `onDidChangeTextDocument`
+ * events. Tuned so a typing burst (one keystroke per ~70ms) resolves
+ * to a single trailing scan once the user pauses. Open/close events
+ * bypass this and still scan immediately so the Problems panel
+ * populates without lag.
+ *
+ * Overridable via the `tokenXray.scan.debounceMs` setting (0–2000).
+ */
+const DEFAULT_CHANGE_DEBOUNCE_MS = 250
+const MIN_CHANGE_DEBOUNCE_MS = 0
+const MAX_CHANGE_DEBOUNCE_MS = 2000
+
+export interface DiagnosticsProviderOptions {
+  /**
+   * Overrides the configured debounce. Set to 0 in tests for sync
+   * behaviour. When omitted the value is read from
+   * `tokenXray.scan.debounceMs` and clamped to a safe range.
+   */
+  changeDebounceMs?: number
+}
+
+function readConfiguredDebounceMs(): number {
+  const raw = workspace
+    .getConfiguration('tokenXray')
+    .get<number>('scan.debounceMs', DEFAULT_CHANGE_DEBOUNCE_MS)
+  if (!Number.isFinite(raw)) return DEFAULT_CHANGE_DEBOUNCE_MS
+  return Math.min(Math.max(Math.floor(raw), MIN_CHANGE_DEBOUNCE_MS), MAX_CHANGE_DEBOUNCE_MS)
+}
+
+export function registerSecurityDiagnosticsProvider(
+  context: ExtensionContext,
+  options: DiagnosticsProviderOptions = {}
+) {
   const registry = createDefaultRegistry()
   const collection = languages.createDiagnosticCollection('tokenXray')
   context.subscriptions.push(collection)
   const debugLog = getDebugLogger(context)
+  // Test path supplies an explicit override; production reads the
+  // user setting on each activation (and re-reads it on config change
+  // below). Held in a mutable ref so the change-event handler can
+  // refresh without re-registering listeners.
+  let changeDebounceMs = options.changeDebounceMs ?? readConfiguredDebounceMs()
 
-  // Per-workspace-folder pattern cache. Refreshed on startup and any
-  // time files in the workspace change so adding / editing / deleting
-  // a `.tokenxrayignore` takes effect without an extension reload.
-  const ignoreCache = new Map<string, string[]>()
+  // Per-workspace-folder ignore-source cache. Each folder maps to its
+  // list of {@link IgnoreSource}s (root `.tokenxrayignore`, root +
+  // nested `.gitignore`). Refreshed on startup and any time files in
+  // the workspace change so adding / editing / deleting an ignore file
+  // takes effect without an extension reload.
+  const ignoreCache = new Map<string, IgnoreSource[]>()
 
   const refreshIgnoreCache = async () => {
     const folders = workspace.workspaceFolders ?? []
     ignoreCache.clear()
     for (const folder of folders) {
-      const patterns = await loadIgnorePatterns(folder)
-      ignoreCache.set(folder.uri.toString(), patterns)
+      const sources = await loadIgnoreSources(folder)
+      ignoreCache.set(folder.uri.toString(), sources)
     }
   }
 
   // Per-URI scan-generation map. `claimScan` issues a globally-unique
-  // token; `isLatestScan` answers whether that token is still the most
-  // recent one for the URI; `invalidateScan` drops the URI's slot so any
-  // in-flight `scanText` whose promise resolves later won't publish. The
-  // counter is global (not per-URI) so a freshly-claimed token can never
-  // collide with one stored by a previous invalidated scan for the same
-  // URI. This is what prevents stale diagnostics from being re-published
-  // after the tab closes (or a newer scan supersedes the in-flight one).
+  // token + AbortController; `isLatestScan` answers whether that token
+  // is still the most recent one for the URI; `invalidateScan` drops
+  // the URI's slot and aborts the controller so any in-flight
+  // `scanText` whose promise hasn't yet resolved both (a) won't publish
+  // and (b) short-circuits its remaining registry walk.
+  //
+  // The counter is global (not per-URI) so a freshly-claimed token can
+  // never collide with one stored by a previous invalidated scan for
+  // the same URI. This is what prevents stale diagnostics from being
+  // re-published after the tab closes (or a newer scan supersedes the
+  // in-flight one).
+  interface ScanSlot {
+    token: number
+    controller: AbortController
+  }
   let scanCounter = 0
-  const scanTokens = new Map<string, number>()
-  const claimScan = (uri: Uri): number => {
-    const token = ++scanCounter
-    scanTokens.set(uri.toString(), token)
-    return token
+  const scanSlots = new Map<string, ScanSlot>()
+  const claimScan = (uri: Uri): ScanSlot => {
+    // Abort the previous in-flight scan for this URI so the analyzer
+    // walk it's in the middle of bails out at the next checkpoint
+    // instead of running to completion before we drop its result.
+    const prior = scanSlots.get(uri.toString())
+    if (prior) prior.controller.abort()
+    const slot: ScanSlot = { token: ++scanCounter, controller: new AbortController() }
+    scanSlots.set(uri.toString(), slot)
+    return slot
   }
   const isLatestScan = (uri: Uri, token: number): boolean =>
-    scanTokens.get(uri.toString()) === token
+    scanSlots.get(uri.toString())?.token === token
   const invalidateScan = (uri: Uri): void => {
-    scanTokens.delete(uri.toString())
+    const slot = scanSlots.get(uri.toString())
+    if (!slot) return
+    slot.controller.abort()
+    scanSlots.delete(uri.toString())
   }
 
-  /** True when any workspace folder's `.tokenxrayignore` excludes this doc. */
+  /**
+   * True when any ignore source (`.tokenxrayignore` or any
+   * `.gitignore`) excludes this doc. Each source's patterns are
+   * matched against the file's path-relative-to-that-source's-dir, so
+   * a `dist/.gitignore` applies to files under `dist/` only.
+   */
   const isIgnored = (doc: TextDocument): boolean => {
     // Resolve to the on-disk URI: for notebook cells that's the parent
     // `.ipynb` file. Untitled buffers fall through to "not ignored".
-    const sourceUri = notebookFileUri(doc.uri) ?? doc.uri
+    const sourceUri = effectiveUri(doc)
     if (sourceUri.scheme !== 'file') return false
     const folder = workspace.getWorkspaceFolder(sourceUri)
     if (!folder) return false
-    const patterns = ignoreCache.get(folder.uri.toString())
-    if (!patterns || patterns.length === 0) return false
-    const rel = relativeFor(doc, folder)
-    if (!rel) return false
-    return matchIgnore(rel, patterns)
+    const sources = ignoreCache.get(folder.uri.toString())
+    if (!sources || sources.length === 0) return false
+    return isIgnoredByAnySource(sourceUri.fsPath, sources)
   }
 
   const refresh = async (doc: TextDocument) => {
     // Claim the latest scan slot for this URI up-front so any earlier
-    // in-flight scan is invalidated even if we exit through the
-    // unsupported / ignored / error paths below.
-    const token = claimScan(doc.uri)
+    // in-flight scan is invalidated (and its AbortSignal fires) even
+    // if we exit through the unsupported / ignored / error paths below.
+    const slot = claimScan(doc.uri)
     if (!SUPPORTED_SCHEMES.has(doc.uri.scheme)) {
       collection.delete(doc.uri)
       return
@@ -241,15 +300,14 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     }
     try {
       const settings = readScanSettings(doc.uri)
-      const filename = filenameFor(doc)
+      const filename = workspaceRelativeFilename(doc)
       // Pretty label for the debug summary: prefer the workspace-
-      // relative path computed by `filenameFor`, fall back to the
-      // URI's last path segment for untitled buffers / files that
-      // aren't inside a workspace folder.
-      const debugLabel =
-        filename ?? doc.uri.path.split('/').pop() ?? doc.uri.toString()
+      // relative path, fall back to the URI's basename for untitled
+      // buffers / files that aren't inside a workspace folder.
+      const debugLabel = filename ?? fallbackDisplayLabel(doc.uri)
       const settingsWithDebug: ScanTextSettings = {
         ...settings,
+        signal: slot.controller.signal,
         onSuppression: (event) => {
           debugLog(
             `${debugLabel}: suppressed ${event.findingId} (${event.analyzerId}) at line ${event.startLine + 1} via ${event.reason}`
@@ -263,10 +321,10 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
       // Drop results when our token is no longer the latest: either the
       // tab was closed mid-scan (token invalidated) or another refresh
       // for the same URI raced past us (token superseded).
-      if (!isLatestScan(doc.uri, token)) return
+      if (!isLatestScan(doc.uri, slot.token)) return
       collection.set(doc.uri, dtos.map(dtoToDiagnostic))
     } catch {
-      if (isLatestScan(doc.uri, token)) collection.delete(doc.uri)
+      if (isLatestScan(doc.uri, slot.token)) collection.delete(doc.uri)
     }
   }
 
@@ -306,10 +364,38 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     refreshAll()
   }
 
+  // Per-URI debounce timers for change events. A keystroke fires
+  // `onDidChangeTextDocument` per character — scanning every one wastes
+  // CPU on large files. We coalesce into a single trailing scan; if a
+  // newer change arrives during the wait, the existing timer is reset
+  // so only the final pause triggers a scan.
+  const changeTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const clearChangeTimer = (uriKey: string) => {
+    const t = changeTimers.get(uriKey)
+    if (t) {
+      clearTimeout(t)
+      changeTimers.delete(uriKey)
+    }
+  }
+  const scheduleChange = (doc: TextDocument) => {
+    if (changeDebounceMs <= 0) {
+      void refresh(doc)
+      return
+    }
+    const key = doc.uri.toString()
+    clearChangeTimer(key)
+    const timer = setTimeout(() => {
+      changeTimers.delete(key)
+      void refresh(doc)
+    }, changeDebounceMs)
+    changeTimers.set(key, timer)
+  }
+
   context.subscriptions.push(
     workspace.onDidOpenTextDocument((doc) => void refresh(doc)),
-    workspace.onDidChangeTextDocument((e) => void refresh(e.document)),
+    workspace.onDidChangeTextDocument((e) => scheduleChange(e.document)),
     workspace.onDidCloseTextDocument((doc) => {
+      clearChangeTimer(doc.uri.toString())
       invalidateScan(doc.uri)
       collection.delete(doc.uri)
     }),
@@ -321,10 +407,15 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     window.tabGroups.onDidChangeTabs((event) => {
       if (event.closed.length === 0) return
       const openTabs = openTabUriStrings()
-      for (const key of Array.from(scanTokens.keys())) {
+      for (const key of Array.from(scanSlots.keys())) {
         const uri = Uri.parse(key)
         if (!openTabs.has(effectiveTabUri(uri).toString())) {
-          scanTokens.delete(key)
+          clearChangeTimer(key)
+          // Abort the in-flight scan AND drop the slot so a later
+          // resolution can't sneak through `isLatestScan`.
+          const slot = scanSlots.get(key)
+          if (slot) slot.controller.abort()
+          scanSlots.delete(key)
         }
       }
       collection.forEach((uri) => {
@@ -334,6 +425,18 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
       })
     }),
     workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('tokenXray.scan.debounceMs')) {
+        // Re-read but keep the explicit test override (caller's `options`
+        // wins). When no override is set the new value takes effect on
+        // the next change event.
+        if (options.changeDebounceMs === undefined) {
+          changeDebounceMs = readConfiguredDebounceMs()
+        }
+      }
+      if (e.affectsConfiguration('tokenXray.respectGitignore')) {
+        void refreshOnIgnoreEvent()
+        return
+      }
       if (
         !e.affectsConfiguration('tokenXray.secrets') &&
         !e.affectsConfiguration('tokenXray.ruleSeverity')
@@ -349,7 +452,15 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
     // not onDidCreateFiles, so we hook that path too.
     workspace.onDidSaveTextDocument((doc) => {
       const base = doc.uri.path.split('/').pop()
-      if (base === IGNORE_FILE_NAME) void refreshOnIgnoreEvent()
-    })
+      if (base === IGNORE_FILE_NAME || base === GITIGNORE_FILE_NAME) {
+        void refreshOnIgnoreEvent()
+      }
+    }),
+    {
+      dispose: () => {
+        for (const t of changeTimers.values()) clearTimeout(t)
+        changeTimers.clear()
+      },
+    }
   )
 }

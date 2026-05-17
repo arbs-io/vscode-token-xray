@@ -1,0 +1,87 @@
+/*
+ * CSS-module styles for the JWT claimset webview. Class names here are
+ * scoped per-file by Vite, so the global `App.css` (which targets `main`
+ * + `main > *`) keeps its layout role and these rules own the component
+ * presentation. Severity colours flow through CSS variables so the
+ * React tree only has to apply the severity class.
+ */
+
+.findingsBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.finding {
+  --finding-bg: #1d3a5a;
+  --finding-fg: #a8d4ff;
+  background: var(--finding-bg);
+  color: var(--finding-fg);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finding.error {
+  --finding-bg: #5a1d1d;
+  --finding-fg: #ffb4b4;
+}
+
+.finding.warning {
+  --finding-bg: #5a4a1d;
+  --finding-fg: #ffe39a;
+}
+
+.finding.info {
+  --finding-bg: #1d3a5a;
+  --finding-fg: #a8d4ff;
+}
+
+.findingLabel {
+  min-width: 56px;
+}
+
+.findingDocLink {
+  color: var(--finding-fg);
+  margin-left: auto;
+}
+
+.encryptedNotice {
+  padding: 12px;
+  border: 1px solid #5a4a1d;
+  border-radius: 4px;
+  color: #ffe39a;
+  margin-bottom: 12px;
+}
+
+.headerSection {
+  margin-bottom: 16px;
+}
+
+.headerTitle {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.headerCode {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 0;
+}
+
+.claimIcon {
+  height: 16px;
+  width: 16px;
+  margin-right: 8px;
+}
+
+.claimValueCell {
+  white-space: pre-line;
+}

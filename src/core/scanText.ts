@@ -1,4 +1,5 @@
 import { AnalyzerRegistry } from './registry'
+import { looksBinary } from './binaryDetection'
 import {
   DiagnosticDto,
   DiagnosticsMetrics,
@@ -67,6 +68,14 @@ export interface ScanTextSettings {
    * `DiagnosticsMetrics` — no new counters are introduced.
    */
   onMetrics?: (metrics: ScanTextMetrics) => void
+  /**
+   * Cooperative cancellation. Forwarded to `diagnosticsAcrossRegistry`
+   * so a newer scan can pre-empt an in-flight one mid-registry-walk.
+   * On abort the function returns `[]` and emits zero metrics; callers
+   * that wrap this for vscode diagnostics drop the result via the
+   * existing per-URI scan-token guard.
+   */
+  signal?: AbortSignal
 }
 
 export const DEFAULT_SECRETS_MAX_FILE_SIZE_BYTES = 1_048_576 // 1 MiB
@@ -118,11 +127,19 @@ export async function scanText(
     emitMetrics(0, 0)
     return []
   }
+  // Binary buffers (PDFs, images, compiled artefacts that VS Code chose
+  // to surface as a TextDocument) produce nothing but high-entropy noise
+  // — skip them before paying the regex cost.
+  if (looksBinary(text)) {
+    emitMetrics(0, 0)
+    return []
+  }
 
   const all = await diagnosticsAcrossRegistry(text, registry, {
     ruleSeverity: settings.ruleSeverity,
     onSuppression: settings.onSuppression,
     onMetrics: captureRegMetrics,
+    signal: settings.signal,
   })
   if (all.length === 0) {
     emitMetrics(0, 0)

@@ -54,7 +54,7 @@ function readRuleSeverity(uri: Uri): SeverityOverrideMap {
  * providers via `scanDocument`, so cost is bounded by the same byte cap
  * as those providers.
  */
-class GenericHoverProvider implements HoverProvider {
+export class GenericHoverProvider implements HoverProvider {
   private readonly registry: AnalyzerRegistry = createDefaultRegistry()
 
   async provideHover(

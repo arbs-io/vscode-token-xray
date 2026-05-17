@@ -1,5 +1,6 @@
 import { Analyzer, Match } from './types'
 import { AnalyzerRegistry } from './registry'
+import { looksBinary } from './binaryDetection'
 
 export interface DetectedToken {
   analyzerId: string
@@ -24,6 +25,7 @@ export function scanDocument(
 ): DetectedToken[] {
   const max = options.maxBytes ?? 1_000_000
   if (text.length === 0 || text.length > max) return []
+  if (looksBinary(text)) return []
   const lineStarts = computeLineStarts(text)
   const found: DetectedToken[] = []
 

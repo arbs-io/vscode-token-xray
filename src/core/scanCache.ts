@@ -46,8 +46,24 @@ export interface ScanCacheInputs {
  * Pure module — no `vscode` import — so it can be unit-tested without
  * the provider mock.
  */
+export interface ScanCacheOptions {
+  /**
+   * Invoked when `scanDocument` or `analyzer.analyze` throws. Defaults
+   * to a no-op so existing call-sites are unaffected. The provider
+   * layer wires this to the `tokenXray.debug` output channel so a
+   * malformed buffer doesn't fail silently when the user is
+   * troubleshooting.
+   */
+  onError?: (where: 'scanDocument' | 'analyze', analyzerId: string | undefined, err: unknown) => void
+}
+
 export class ScanCache {
   private readonly entries = new Map<string, CachedToken[]>()
+  private readonly onError: NonNullable<ScanCacheOptions['onError']>
+
+  constructor(options: ScanCacheOptions = {}) {
+    this.onError = options.onError ?? (() => undefined)
+  }
 
   getTokens(input: ScanCacheInputs): CachedToken[] {
     const key = this.keyFor(input.uriKey, input.version)
@@ -95,7 +111,8 @@ export class ScanCache {
     let hits: ReturnType<typeof scanDocument>
     try {
       hits = scanDocument(input.text, input.registry)
-    } catch {
+    } catch (err) {
+      this.onError('scanDocument', undefined, err)
       return []
     }
     const out: CachedToken[] = []
@@ -124,8 +141,8 @@ export class ScanCache {
           sections: result.sections ?? [],
           findings: result.findings ?? [],
         })
-      } catch {
-        // skip on analyze failure (matches existing behaviour)
+      } catch (err) {
+        this.onError('analyze', hit.analyzerId, err)
       }
     }
     return out

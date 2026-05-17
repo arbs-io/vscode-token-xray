@@ -172,9 +172,49 @@ Tune individual rule severities (or turn rules off entirely) via the `tokenXray.
 | `tokenXray.secrets.exclude`             | `[]`      | Glob patterns to skip secret scanning for (independent of `.tokenxrayignore`)              |
 | `tokenXray.secrets.maxFileSizeBytes`    | `1048576` | Skip secret scanning on documents larger than this (1 MiB default)                         |
 | `tokenXray.secrets.codeActions.enabled` | `true`    | Enable the Redact / Move-to-.env quick fixes                                               |
+| `tokenXray.respectGitignore`            | `true`    | Merge workspace `.gitignore` (root + nested) into the ignore set so gitignored files are skipped |
+| `tokenXray.scan.debounceMs`             | `250`     | Trailing-edge debounce (0–2000 ms) applied to text-change events before re-scanning        |
 | `tokenXray.inlayHints.enabled`          | `true`    | Show inline expiry / severity hints next to tokens                                         |
 | `tokenXray.ruleSeverity`                | `{}`      | Per-rule severity overrides (`error` / `warning` / `info` / `off`)                         |
 | `tokenXray.debug`                       | `false`   | Log scan counts and suppressions to the Token X-Ray output channel                         |
+
+### Example `settings.json`
+
+A typical setup that verifies JWTs against a known JWKS, dials down the noise on AWS ARN findings, and disables the OpenAI rule entirely:
+
+```json
+{
+  "tokenXray.jwt.verifySignature": true,
+  "tokenXray.jwt.expectedIssuer": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+  "tokenXray.jwt.expectedAudience": "api://your-app-id",
+  "tokenXray.jwt.keys": [
+    {
+      "kty": "RSA",
+      "kid": "your-key-id",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "...base64url-modulus...",
+      "e": "AQAB"
+    },
+    { "pem": "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----", "alg": "RS256", "kid": "rotated-key" },
+    { "secret": "shared-hmac-secret", "alg": "HS256", "kid": "hs-key" }
+  ],
+
+  "tokenXray.ruleSeverity": {
+    "secret.aws.arn": "info",
+    "jwt.alg.none": "error",
+    "secret.openai.*": "off"
+  },
+
+  "tokenXray.respectGitignore": true,
+  "tokenXray.scan.debounceMs": 150,
+  "tokenXray.secrets.exclude": ["**/fixtures/**", "**/__snapshots__/**"],
+  "tokenXray.inlayHints.enabled": true,
+  "tokenXray.debug": false
+}
+```
+
+Malformed entries in `tokenXray.jwt.keys` are surfaced with a one-shot warning toast (with an **Open Settings** button) and a line in the **Token X-Ray** output channel; valid entries are loaded silently.
 
 ## Architecture
 
@@ -220,7 +260,3 @@ Sample fixtures live in `/sample` (JWTs, certificates, SAML responses, JWKs, coo
 If you find Token X-Ray useful, a rating on the Visual Studio Marketplace makes a real difference. Bugs and feature requests are very welcome on the GitHub issue tracker, and pull requests even more so.
 
 This is a personal passion project — sponsoring on GitHub helps keep time carved out for it.
-
----
-
-<sub>Suggested GitHub repository description: **X-ray vision for tokens and secrets in VS Code — locally inspect JWTs, SAML, X.509, JWKs, OAuth, PASETO, SSH keys, PGP, cookies, and detect 90+ vendor credentials in any file.**</sub>
