@@ -29,8 +29,28 @@ const SEVERITY_MAP: Record<DiagnosticDto['severity'], DiagnosticSeverity> = {
   hint: DiagnosticSeverity.Hint,
 }
 
-const SUPPORTED_SCHEMES = new Set(['file', 'untitled'])
+// `vscode-notebook-cell` is opted in so each Jupyter notebook cell flows
+// through the diagnostics pipeline like an ordinary source document. VS Code
+// surfaces every cell as its own `TextDocument` and fires the standard
+// open/change/close events for it, so no separate notebook listener is needed.
+const SUPPORTED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell'])
 const IGNORE_FILE_NAME = '.tokenxrayignore'
+
+/**
+ * Recover the parent `.ipynb` file path from a `vscode-notebook-cell` URI.
+ *
+ * VS Code encodes the cell URI as `vscode-notebook-cell:///path/to/file.ipynb#cellId`,
+ * so the notebook's on-disk path lives in `uri.path` and the cell id lives in
+ * `uri.fragment`. Building a synthetic `file:` URI with the same `.path` lets
+ * the caller reuse the existing `filenameFor` / `relativeFor` plumbing — the
+ * fsPath conversion handles the leading slash + Windows drive-letter quirks
+ * exactly the same way it does for a real file URI.
+ */
+function notebookFileUri(cellUri: Uri): Uri | undefined {
+  if (cellUri.scheme !== 'vscode-notebook-cell') return undefined
+  if (!cellUri.path) return undefined
+  return cellUri.with({ scheme: 'file', fragment: '' })
+}
 
 function dtoToDiagnostic(dto: DiagnosticDto): Diagnostic {
   const diag = new Diagnostic(
@@ -59,18 +79,23 @@ function readScanSettings(uri: Uri): ScanTextSettings {
 }
 
 function filenameFor(doc: TextDocument): string | undefined {
-  if (doc.uri.scheme === 'file') {
-    const folder = workspace.getWorkspaceFolder(doc.uri)
+  // For notebook cell documents the on-disk filename is the parent
+  // `.ipynb`; the cell URI itself has no on-disk representation. Falling
+  // back to the synthesised file URI keeps exclude-glob matching aligned
+  // with how the user thinks about the file (`notebooks/leak.ipynb`).
+  const sourceUri = notebookFileUri(doc.uri) ?? doc.uri
+  if (sourceUri.scheme === 'file') {
+    const folder = workspace.getWorkspaceFolder(sourceUri)
     if (folder) {
       const folderPath = folder.uri.fsPath
-      const filePath = doc.uri.fsPath
+      const filePath = sourceUri.fsPath
       if (filePath.startsWith(folderPath)) {
         // Strip the workspace prefix + leading separator so exclude globs are
         // matched against a workspace-relative path.
         return filePath.slice(folderPath.length).replace(/^[\\/]+/, '')
       }
     }
-    return doc.uri.fsPath
+    return sourceUri.fsPath
   }
   // untitled buffers — no on-disk filename
   return undefined
@@ -86,9 +111,13 @@ function relativeFor(
   doc: TextDocument,
   folder: WorkspaceFolder
 ): string | undefined {
-  if (doc.uri.scheme !== 'file') return undefined
+  // For notebook cell documents the path is on the parent `.ipynb` URI;
+  // applying the ignore pattern against that path means ignoring
+  // `*.ipynb` suppresses every cell in the notebook in one shot.
+  const sourceUri = notebookFileUri(doc.uri) ?? doc.uri
+  if (sourceUri.scheme !== 'file') return undefined
   const folderPath = folder.uri.fsPath
-  const filePath = doc.uri.fsPath
+  const filePath = sourceUri.fsPath
   if (!filePath.startsWith(folderPath)) return undefined
   return filePath.slice(folderPath.length).replace(/^[\\/]+/, '').replace(/\\/g, '/')
 }
@@ -157,8 +186,11 @@ export function registerSecurityDiagnosticsProvider(context: ExtensionContext) {
 
   /** True when any workspace folder's `.tokenxrayignore` excludes this doc. */
   const isIgnored = (doc: TextDocument): boolean => {
-    if (doc.uri.scheme !== 'file') return false
-    const folder = workspace.getWorkspaceFolder(doc.uri)
+    // Resolve to the on-disk URI: for notebook cells that's the parent
+    // `.ipynb` file. Untitled buffers fall through to "not ignored".
+    const sourceUri = notebookFileUri(doc.uri) ?? doc.uri
+    if (sourceUri.scheme !== 'file') return false
+    const folder = workspace.getWorkspaceFolder(sourceUri)
     if (!folder) return false
     const patterns = ignoreCache.get(folder.uri.toString())
     if (!patterns || patterns.length === 0) return false
