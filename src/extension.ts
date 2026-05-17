@@ -11,6 +11,7 @@ import { registerInlayHintsProvider } from './providers/inlayHintsProvider'
 import { registerSecretCodeActionsProvider } from './providers/secretCodeActionsProvider'
 import { registerSecurityCodeLensProvider } from './providers/securityCodeLensProvider'
 import { registerSecurityDiagnosticsProvider } from './providers/securityDiagnosticsProvider'
+import { registerStatusBarBadgeProvider } from './providers/statusBarBadgeProvider'
 
 export function activate(context: ExtensionContext) {
   // Generic, content-driven analysis — works on any open document.
@@ -21,6 +22,7 @@ export function activate(context: ExtensionContext) {
   registerDocumentLinksProvider(context)
   registerDocumentSymbolsProvider(context)
   registerFindingsTreeViewProvider(context)
+  registerStatusBarBadgeProvider(context)
   registerInspectCommand(context)
 
   // JWT-specific glue for the existing `jwt` language id (semantic colours, hover, title-bar buttons).
