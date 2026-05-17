@@ -17,7 +17,7 @@ const CLIENT_ID: SecretRule = {
   vendor: 'sailpoint',
   name: 'SailPoint API client_id (labelled)',
   pattern: new RegExp(
-    `${ID_LABEL}["']?\\s*[:=]\\s*["']?[0-9a-fA-F]{32}["']?`,
+    String.raw`${ID_LABEL}["']?\s*[:=]\s*["']?[0-9a-fA-F]{32}["']?`,
     'g'
   ),
   severity: 'info',
@@ -31,7 +31,7 @@ const CLIENT_SECRET: SecretRule = {
   vendor: 'sailpoint',
   name: 'SailPoint API client_secret (labelled)',
   pattern: new RegExp(
-    `${SECRET_LABEL}["']?\\s*[:=]\\s*["']?[A-Za-z0-9_-]{40,}["']?`,
+    String.raw`${SECRET_LABEL}["']?\s*[:=]\s*["']?[A-Za-z0-9_-]{40,}["']?`,
     'g'
   ),
   severity: 'error',
@@ -44,7 +44,7 @@ const TENANT_URL: SecretRule = {
   vendor: 'sailpoint',
   name: 'SailPoint tenant URL (labelled)',
   pattern: new RegExp(
-    `${TENANT_LABEL}["']?\\s*[:=]\\s*["']?(?:https?:\\/\\/)?[a-z0-9-]+\\.api\\.identitynow\\.com[A-Za-z0-9/_.-]*["']?`,
+    String.raw`${TENANT_LABEL}["']?\s*[:=]\s*["']?(?:https?://)?[a-z0-9-]+\.api\.identitynow\.com[A-Za-z0-9/_.-]*["']?`,
     'g'
   ),
   severity: 'info',

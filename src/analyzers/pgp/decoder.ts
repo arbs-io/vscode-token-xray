@@ -181,5 +181,5 @@ function base64ToBytes(body: string): Uint8Array | undefined {
 }
 
 function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
 }

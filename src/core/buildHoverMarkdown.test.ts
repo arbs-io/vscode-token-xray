@@ -519,7 +519,7 @@ describe('buildHoverMarkdown', () => {
           ],
         })
       )
-      expect(md).toContain('| k | a\\|b<br>c |')
+      expect(md).toContain(String.raw`| k | a\|b<br>c |`)
     })
 
     it('renders null / undefined values as _(none)_', () => {

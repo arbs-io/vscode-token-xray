@@ -92,7 +92,7 @@ function compileGlob(pattern: string, options: GlobMatchOptions): RegExp {
     } else if (c === '[') {
       const close = p.indexOf(']', i + 1)
       if (close === -1) {
-        re += '\\['
+        re += String.raw`\[`
         i += 1
       } else {
         re += '[' + p.slice(i + 1, close) + ']'
