@@ -43,6 +43,23 @@
   "main": "./out/extension.js",
   "browser": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tokenXray",
+          "title": "Token X-Ray",
+          "icon": "images/logo_128x128.png"
+        }
+      ]
+    },
+    "views": {
+      "tokenXray": [
+        {
+          "id": "tokenXray.findings",
+          "name": "Findings"
+        }
+      ]
+    },
     "languages": [
       {
         "id": "jwt",

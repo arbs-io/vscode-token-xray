@@ -5,6 +5,7 @@ import { registerShowJsonPreviewCommand } from './contexts/registerShowJsonPrevi
 import { registerDocumentLinksProvider } from './providers/documentLinksProvider'
 import { registerDocumentSemanticTokensProvider } from './providers/documentSemanticTokensProvider'
 import { registerDocumentSymbolsProvider } from './providers/documentSymbolsProvider'
+import { registerFindingsTreeViewProvider } from './providers/findingsTreeViewProvider'
 import { registerHoverProvider } from './providers/hoverProvider'
 import { registerInlayHintsProvider } from './providers/inlayHintsProvider'
 import { registerSecretCodeActionsProvider } from './providers/secretCodeActionsProvider'
@@ -19,6 +20,7 @@ export function activate(context: ExtensionContext) {
   registerInlayHintsProvider(context)
   registerDocumentLinksProvider(context)
   registerDocumentSymbolsProvider(context)
+  registerFindingsTreeViewProvider(context)
   registerInspectCommand(context)
 
   // JWT-specific glue for the existing `jwt` language id (semantic colours, hover, title-bar buttons).
