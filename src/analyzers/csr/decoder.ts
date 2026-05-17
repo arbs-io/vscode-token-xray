@@ -240,32 +240,34 @@ function readTlv(buf: Uint8Array, offset: number): Tlv {
  *  Subject Name → "CN=foo, O=bar"
  * ------------------------------------------------------------------ */
 
+function readAvaPart(buf: Uint8Array, ava: Tlv): string | undefined {
+  if (ava.tag !== TAG_SEQUENCE) return undefined
+  const oidTlv = readTlv(buf, ava.contentStart)
+  if (oidTlv.tag !== TAG_OID) return undefined
+  const oid = decodeOid(buf, oidTlv)
+  const valueTlv = readTlv(buf, oidTlv.contentEnd)
+  const value = decodeString(buf, valueTlv)
+  if (value === undefined) return undefined
+  const label = NAME_ATTR_LABEL[oid] ?? oid
+  return `${label}=${value}`
+}
+
+function readRdnParts(buf: Uint8Array, rdn: Tlv, parts: string[]): void {
+  let inner = rdn.contentStart
+  while (inner < rdn.contentEnd) {
+    const ava = readTlv(buf, inner)
+    const part = readAvaPart(buf, ava)
+    if (part !== undefined) parts.push(part)
+    inner = ava.contentEnd
+  }
+}
+
 function parseName(buf: Uint8Array, name: Tlv): string {
   const parts: string[] = []
   let cursor = name.contentStart
   while (cursor < name.contentEnd) {
     const rdn = readTlv(buf, cursor)
-    if (rdn.tag !== TAG_SET) {
-      cursor = rdn.contentEnd
-      continue
-    }
-    let inner = rdn.contentStart
-    while (inner < rdn.contentEnd) {
-      const ava = readTlv(buf, inner)
-      if (ava.tag === TAG_SEQUENCE) {
-        const oidTlv = readTlv(buf, ava.contentStart)
-        if (oidTlv.tag === TAG_OID) {
-          const oid = decodeOid(buf, oidTlv)
-          const valueTlv = readTlv(buf, oidTlv.contentEnd)
-          const value = decodeString(buf, valueTlv)
-          if (value !== undefined) {
-            const label = NAME_ATTR_LABEL[oid] ?? oid
-            parts.push(`${label}=${value}`)
-          }
-        }
-      }
-      inner = ava.contentEnd
-    }
+    if (rdn.tag === TAG_SET) readRdnParts(buf, rdn, parts)
     cursor = rdn.contentEnd
   }
   return parts.join(', ')
@@ -369,42 +371,47 @@ function parseAttributesForSan(buf: Uint8Array, attrs: Tlv): string[] {
   return sans
 }
 
+function findSanOctetString(buf: Uint8Array, ext: Tlv, oidEnd: number): Tlv | undefined {
+  // The next TLV is either OCTET STRING (DER-encoded SAN) or — if
+  // an optional `critical BOOLEAN` is present — a BOOLEAN followed
+  // by the OCTET STRING. Walk forward looking for the OCTET STRING.
+  let inner = oidEnd
+  while (inner < ext.contentEnd) {
+    const t = readTlv(buf, inner)
+    if (t.tag === TAG_OCTET_STRING) return t
+    inner = t.contentEnd
+  }
+  return undefined
+}
+
+function extractExtensionSans(buf: Uint8Array, ext: Tlv): string[] {
+  if (ext.tag !== TAG_SEQUENCE) return []
+  const oidTlv = readTlv(buf, ext.contentStart)
+  if (oidTlv.tag !== TAG_OID) return []
+  if (decodeOid(buf, oidTlv) !== OID_SUBJECT_ALT_NAME) return []
+  const octet = findSanOctetString(buf, ext, oidTlv.contentEnd)
+  if (!octet) return []
+  const sanSeq = readTlv(buf, octet.contentStart)
+  if (sanSeq.tag !== TAG_SEQUENCE) return []
+  return parseSanNames(buf, sanSeq)
+}
+
+function walkExtensions(buf: Uint8Array, seq: Tlv, sans: string[]): void {
+  let extCursor = seq.contentStart
+  while (extCursor < seq.contentEnd) {
+    const ext = readTlv(buf, extCursor)
+    sans.push(...extractExtensionSans(buf, ext))
+    extCursor = ext.contentEnd
+  }
+}
+
 function parseExtensionRequest(buf: Uint8Array, set: Tlv): string[] {
   // SET OF { SEQUENCE OF Extension }
   const sans: string[] = []
   let cursor = set.contentStart
   while (cursor < set.contentEnd) {
     const seq = readTlv(buf, cursor)
-    if (seq.tag === TAG_SEQUENCE) {
-      let extCursor = seq.contentStart
-      while (extCursor < seq.contentEnd) {
-        const ext = readTlv(buf, extCursor)
-        if (ext.tag === TAG_SEQUENCE) {
-          const oidTlv = readTlv(buf, ext.contentStart)
-          if (oidTlv.tag === TAG_OID) {
-            const extOid = decodeOid(buf, oidTlv)
-            if (extOid === OID_SUBJECT_ALT_NAME) {
-              // The next TLV is either OCTET STRING (DER-encoded SAN) or — if
-              // an optional `critical BOOLEAN` is present — a BOOLEAN followed
-              // by the OCTET STRING. Walk forward looking for the OCTET STRING.
-              let inner = oidTlv.contentEnd
-              while (inner < ext.contentEnd) {
-                const t = readTlv(buf, inner)
-                if (t.tag === TAG_OCTET_STRING) {
-                  const sanSeq = readTlv(buf, t.contentStart)
-                  if (sanSeq.tag === TAG_SEQUENCE) {
-                    sans.push(...parseSanNames(buf, sanSeq))
-                  }
-                  break
-                }
-                inner = t.contentEnd
-              }
-            }
-          }
-        }
-        extCursor = ext.contentEnd
-      }
-    }
+    if (seq.tag === TAG_SEQUENCE) walkExtensions(buf, seq, sans)
     cursor = seq.contentEnd
   }
   return sans
