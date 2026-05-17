@@ -123,6 +123,31 @@ describe('scanForSecrets', () => {
     const hits = scanForSecrets('XYZ', { rules: [a, b] })
     expect(hits).toHaveLength(2)
   })
+
+  it('suppresses high-entropy hits inside a PEM certificate body', () => {
+    const pemCert = [
+      '-----BEGIN CERTIFICATE-----',
+      'MIIDazCCAlOgAwIBAgIUJrQp4n6gZyMqQyhcuPmkF8z4iN0wDQYJKoZIhvcNAQEL',
+      'BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM',
+      'GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNTAxMDEwMDAwMDBaFw0yNjAx',
+      '-----END CERTIFICATE-----',
+    ].join('\n')
+    const hits = scanForSecrets(pemCert)
+    expect(hits.some((h) => h.rule.id === 'secret.generic.highEntropy')).toBe(false)
+  })
+
+  it('suppresses high-entropy hits inside a JWT shape', () => {
+    const jwt =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.4Adcj3UFYzPUVaVF43FmMab6RlaQD8A9V8wFzzht-KQ'
+    const hits = scanForSecrets(`const token = "${jwt}"`)
+    expect(hits.some((h) => h.rule.id === 'secret.generic.highEntropy')).toBe(false)
+  })
+
+  it('still emits a high-entropy hit on a standalone opaque string', () => {
+    const opaque = 'Xb7HqL3kZ9pNvW2tR8mYj5cVfA4dGeUaQsK1iOpBnMlEz6'
+    const hits = scanForSecrets(`API_TOKEN = "${opaque}"`)
+    expect(hits.some((h) => h.rule.id === 'secret.generic.highEntropy')).toBe(true)
+  })
 })
 
 describe('findingsForSecrets', () => {
