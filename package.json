@@ -4,7 +4,7 @@
   "description": "X-ray vision for tokens and secrets: locally inspect JWTs, SAML assertions, certificates, OAuth tokens, and detect credentials in any file. No data leaves your machine.",
   "version": "1.0.0",
   "publisher": "AndrewButson",
-  "icon": "images/logo_128x128.png",
+  "icon": "images/vscode-token-xray-light.png",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -34,7 +34,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "deploy": "vsce publish --yarn",
+    "deploy": "vsce publish --no-dependencies",
     "clean": "node ./utilities/scripts/clean.js"
   },
   "activationEvents": [
