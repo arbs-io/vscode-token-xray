@@ -109,6 +109,27 @@ function stripInputPrefix(header: string): string {
  * for the signature), this parser requires at least one quoted
  * `key="value"` pair (the unquoted form would not appear in Cavage).
  */
+function parseFields(parts: string[]): Record<string, string> | undefined {
+  const fields: Record<string, string> = {}
+  for (const part of parts) {
+    const trimmedPart = part.trim()
+    if (trimmedPart.length === 0) continue
+    const m = /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*("([^"]*)"|(\d+))\s*$/.exec(trimmedPart)
+    if (!m) return undefined
+    const key = m[1].toLowerCase()
+    // Quoted value is in group 3; bare numeric value is in group 4.
+    fields[key] = m[3] ?? m[4]
+  }
+  return fields
+}
+
+function extractHeadersList(headers: string): string[] {
+  return headers
+    .split(/\s+/)
+    .map((h) => h.trim())
+    .filter((h) => h.length > 0)
+}
+
 export function parseCavageSignature(header: string): CavageSig | undefined {
   if (typeof header !== 'string') return undefined
   const trimmed = stripPrefix(header)
@@ -121,30 +142,17 @@ export function parseCavageSignature(header: string): CavageSig | undefined {
   const parts = splitOutsideQuotes(trimmed)
   if (parts.length === 0) return undefined
 
-  const fields: Record<string, string> = {}
-  for (const part of parts) {
-    const trimmedPart = part.trim()
-    if (trimmedPart.length === 0) continue
-    const m = /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*("([^"]*)"|(\d+))\s*$/.exec(trimmedPart)
-    if (!m) return undefined
-    const key = m[1].toLowerCase()
-    // Quoted value is in group 3; bare numeric value is in group 4.
-    const value = m[3] ?? m[4]
-    fields[key] = value
-  }
+  const fields = parseFields(parts)
+  if (!fields) return undefined
 
   const keyId = fields.keyid
   const signature = fields.signature
   if (!keyId || !signature) return undefined
-  if (keyId.length === 0 || signature.length === 0) return undefined
 
   const result: CavageSig = { keyId, signature }
   if (fields.algorithm) result.algorithm = fields.algorithm
   if (fields.headers) {
-    const list = fields.headers
-      .split(/\s+/)
-      .map((h) => h.trim())
-      .filter((h) => h.length > 0)
+    const list = extractHeadersList(fields.headers)
     if (list.length > 0) result.headers = list
   }
   if (fields.created !== undefined && /^\d+$/.test(fields.created)) {
@@ -200,6 +208,49 @@ function splitParams(value: string): string[] {
  * The `Signature` header is optional — when supplied, the matching
  * label's base64 blob is extracted; mismatched labels are ignored.
  */
+function applyRfc9421Param(result: Rfc9421Sig, key: string, value: string): void {
+  switch (key) {
+    case 'keyid':
+      result.keyId = value
+      return
+    case 'nonce':
+      result.nonce = value
+      return
+    case 'alg':
+    case 'algorithm':
+      result.algorithm = value
+      return
+    case 'created':
+      if (/^\d+$/.test(value)) result.created = Number(value)
+      return
+    case 'expires':
+      if (/^\d+$/.test(value)) result.expires = Number(value)
+      return
+  }
+}
+
+function applyRfc9421Params(result: Rfc9421Sig, paramsRaw: string): void {
+  if (paramsRaw.trim().length === 0) return
+  for (const part of splitParams(paramsRaw)) {
+    const trimmedPart = part.trim()
+    if (trimmedPart.length === 0) continue
+    const m = /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*("([^"]*)"|(\d+))\s*$/.exec(trimmedPart)
+    if (!m) continue
+    applyRfc9421Param(result, m[1].toLowerCase(), m[3] ?? m[4])
+  }
+}
+
+function findSignatureBlob(signatureHeader: string, label: string): string | undefined {
+  const sigTrimmed = stripPrefix(signatureHeader)
+  // Format: `<label>=:base64==:[, <label2>=:…:]`.
+  const sigRegex = /([A-Za-z0-9_-]+)\s*=\s*:([^:]*):/g
+  let m: RegExpExecArray | null
+  while ((m = sigRegex.exec(sigTrimmed)) !== null) {
+    if (m[1] === label) return m[2].length > 0 ? m[2] : undefined
+  }
+  return undefined
+}
+
 export function parseRfc9421(
   input: string,
   signatureHeader?: string
@@ -227,33 +278,11 @@ export function parseRfc9421(
   if (components.length === 0) return undefined
 
   const result: Rfc9421Sig = { label, components }
-  if (paramsRaw.trim().length > 0) {
-    for (const part of splitParams(paramsRaw)) {
-      const trimmedPart = part.trim()
-      if (trimmedPart.length === 0) continue
-      const m = /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*("([^"]*)"|(\d+))\s*$/.exec(trimmedPart)
-      if (!m) continue
-      const key = m[1].toLowerCase()
-      const value = m[3] ?? m[4]
-      if (key === 'keyid') result.keyId = value
-      else if (key === 'nonce') result.nonce = value
-      else if (key === 'alg' || key === 'algorithm') result.algorithm = value
-      else if (key === 'created' && /^\d+$/.test(value)) result.created = Number(value)
-      else if (key === 'expires' && /^\d+$/.test(value)) result.expires = Number(value)
-    }
-  }
+  applyRfc9421Params(result, paramsRaw)
 
   if (signatureHeader) {
-    const sigTrimmed = stripPrefix(signatureHeader)
-    // Format: `<label>=:base64==:[, <label2>=:…:]`.
-    const sigRegex = /([A-Za-z0-9_-]+)\s*=\s*:([^:]*):/g
-    let m: RegExpExecArray | null
-    while ((m = sigRegex.exec(sigTrimmed)) !== null) {
-      if (m[1] === label) {
-        if (m[2].length > 0) result.signature = m[2]
-        break
-      }
-    }
+    const sig = findSignatureBlob(signatureHeader, label)
+    if (sig) result.signature = sig
   }
   return result
 }
